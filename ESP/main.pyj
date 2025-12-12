@@ -1,3 +1,4 @@
+## ESP logic adapted from: https://github.com/dementiaenjoyer/Minescript-Projects/tree/main/ESP
 from FlameClient.ESP.globals import *;
 import FlameClient.ESP.healthbars as HEALTHBARS;
 
