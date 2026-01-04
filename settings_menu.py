@@ -1,11 +1,24 @@
 import sys
 import os
 import pprint
-import customtkinter as ctk
-import tkinter as tk
 import ctypes
 import subprocess
 from tkinter import font
+import tkinter as tk
+
+# Dependency Check
+try:
+    import customtkinter as ctk
+except ImportError:
+    import tkinter.messagebox
+    root = tk.Tk()
+    root.withdraw()
+    tkinter.messagebox.showerror("Missing Dependency", 
+        "Flame Client requires 'customtkinter'.\n\n"
+        "Please install it by running:\n"
+        "pip install customtkinter\n\n"
+        "in your terminal or command prompt.")
+    sys.exit(1)
 
 # Add minescript root to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -100,6 +113,11 @@ class BaseWindow(ctk.CTkToplevel):
         
         return content_frame
 
+    def add_label(self, parent, text, text_color=None):
+        label = ctk.CTkLabel(parent, text=text, font=("Nunito", 10), text_color=text_color)
+        label.pack(anchor="w", pady=2)
+        return label
+
     def add_switch(self, parent, text, setting_key):
         switch = ctk.CTkSwitch(parent, text=text, font=("Nunito", 12), command=lambda: self.master.update_setting(setting_key, switch.get()))
         if SETTINGS.get(setting_key):
@@ -163,6 +181,23 @@ class BaseWindow(ctk.CTkToplevel):
         slider.pack(fill="x")
         
         return slider
+
+    def add_combobox(self, parent, text, setting_key, values):
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.pack(pady=2, fill="x")
+        
+        label = ctk.CTkLabel(frame, text=text, font=("Nunito", 12))
+        label.pack(side="left", padx=0)
+        
+        def callback(choice):
+            SETTINGS[setting_key] = choice
+            self.master.schedule_save()
+            
+        combo = ctk.CTkComboBox(frame, values=values, command=callback, width=120, height=24, font=("Nunito", 12))
+        combo.set(SETTINGS.get(setting_key, values[0]))
+        combo.pack(side="right", padx=0)
+        
+        return combo
         
     def refresh_ui(self):
         for cb in self.refresh_callbacks:
@@ -239,6 +274,10 @@ class SettingsApp(ctk.CTk):
         # Aimbot
         content_aim = self.combat_window.add_collapsible_section(self.combat_window, "AIMBOT")
         self.setup_aimbot_section(content_aim, self.combat_window)
+
+        # Silent Aimbot
+        content_silent = self.combat_window.add_collapsible_section(self.combat_window, "SILENT AIMBOT")
+        self.setup_silent_aimbot_section(content_silent, self.combat_window)
 
         # Triggerbot
         content_trigger = self.combat_window.add_collapsible_section(self.combat_window, "TRIGGERBOT")
@@ -365,6 +404,9 @@ class SettingsApp(ctk.CTk):
         
         window.add_switch(parent, "Enable Module", "AIMBOT_ENABLED")
         
+        window.add_combobox(parent, "Mode", "AIMBOT_MODE", ["1.21", "1.8"])
+        window.add_slider(parent, "CPS (1.8 Only)", "AIMBOT_CPS", 1, 20, steps=19, is_int=True)
+        
         window.add_switch(parent, "Target Mode (ON=Closest, OFF=Lock)", "AIMBOT_TARGET_MODE")
         
         # Sub-features
@@ -378,6 +420,11 @@ class SettingsApp(ctk.CTk):
         window.add_slider(parent, "Min Dist", "AIMBOT_MIN_DIST", 0.0, 5.0, steps=50)
         window.add_slider(parent, "Aim Randomness", "AIMBOT_RANDOMNESS", 0.0, 30.0, steps=300)
         window.add_slider(parent, "Timing Randomness", "AIMBOT_TIMING_RANDOMNESS", 0.0, 0.2, steps=20)
+
+    def setup_silent_aimbot_section(self, parent, window):
+        window.add_button(parent, lambda: self.get_key_text("SILENT_AIMBOT_KEY", "Silent Aim Key"), lambda: self.update_keybind("SILENT_AIMBOT_KEY"))
+        window.add_switch(parent, "Enable Module", "SILENT_AIMBOT_ENABLED")
+        window.add_label(parent, "Uses Aimbot Min Dist & Randomness settings", text_color="#AAAAAA")
 
     def setup_triggerbot_section(self, parent, window):
         window.add_button(parent, lambda: self.get_key_text("TRIGGERBOT_KEY", "Trigger Key"), lambda: self.update_keybind("TRIGGERBOT_KEY"))

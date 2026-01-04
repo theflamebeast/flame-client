@@ -218,7 +218,11 @@ class Aimbot:
         try:
             target = self.get_target()
             if target:
-                self.aim_at(target)
+                mode = SETTINGS.get("AIMBOT_MODE", "1.21")
+                if mode == "1.8":
+                    self.run_1_8(target)
+                else:
+                    self.run_1_21(target)
             else:
                 if self.was_chasing:
                     self.stop_movement()
@@ -259,28 +263,19 @@ class Aimbot:
         except: pass
         return None
 
-    def aim_at(self, target):
+    def get_distance(self, target):
+        pos = target.position
+        my_pos = minescript.player_position()
+        return math.sqrt((pos[0] - my_pos[0])**2 + 
+                         (pos[1] - my_pos[1])**2 + 
+                         (pos[2] - my_pos[2])**2)
+
+    def aim_at_target(self, target):
         pos = target.position
         my_pos = minescript.player_position()
         
-        # Distance check
-        dist = math.sqrt((pos[0] - my_pos[0])**2 + 
-                         (pos[1] - my_pos[1])**2 + 
-                         (pos[2] - my_pos[2])**2)
-        
-        debug_log(f"Aiming: {target.name} Dist: {dist:.2f}")
-
-        min_dist = SETTINGS.get("AIMBOT_MIN_DIST", 1.0)
-        if dist < min_dist:
-            self.stop_movement()
-            return
-
-        # Aim Logic with Intensity (Smoothing)
         intensity = SETTINGS.get("AIMBOT_INTENSITY", 5.0)
-        randomness = SETTINGS.get("AIMBOT_RANDOMNESS", 0.0)
         
-        # Random offsets are now updated after each hit (see below)
-
         if intensity >= 5.0:
             # Instant snap (with randomness)
             dx = pos[0] - my_pos[0]
@@ -317,15 +312,76 @@ class Aimbot:
             new_pitch = current_pitch + diff_pitch * factor
             
             minescript.player_set_orientation(new_yaw, new_pitch)
+
+    def run_1_8(self, target):
+        # 1. Always Aim
+        self.aim_at_target(target)
         
-        # Auto Attack & Movement Logic
+        dist = self.get_distance(target)
+        min_dist = SETTINGS.get("AIMBOT_MIN_DIST", 1.0)
+        
+        if dist < min_dist:
+            self.stop_movement()
+            return
+
+        if dist <= 3.5:
+            self.was_chasing = True
+            
+            # W-Tap Pause Check
+            if self.resume_w_time > 0:
+                if time.time() >= self.resume_w_time:
+                    minescript.player_press_forward(True)
+                    self.resume_w_time = 0
+                return
+
+            # Attack (Spam Click)
+            cps = SETTINGS.get("AIMBOT_CPS", 12)
+            if time.time() - self.last_attack_time >= (1.0 / cps):
+                minescript.player_press_forward(True)
+                
+                if SETTINGS.get("AIMBOT_ATTACK_ENABLED", True):
+                    minescript.player_press_attack(True)
+                    minescript.player_press_attack(False)
+                
+                self.last_attack_time = time.time()
+                
+                # W-Tap Logic (Random chance or every N hits?)
+                # For 1.8, let's just W-Tap occasionally
+                if SETTINGS.get("AIMBOT_WTAP_ENABLED", True):
+                    if random.random() < 0.3: # 30% chance per hit
+                        minescript.player_press_forward(False)
+                        self.resume_w_time = time.time() + 0.1
+        else:
+            minescript.player_press_forward(True)
+            self.was_chasing = True
+
+    def run_1_21(self, target):
+        # 1. Always Aim (Reverted to standard behavior)
+        self.aim_at_target(target)
+        
+        dist = self.get_distance(target)
+        min_dist = SETTINGS.get("AIMBOT_MIN_DIST", 1.0)
+        
+        if dist < min_dist:
+            self.stop_movement()
+            return
+
+        # 2. Check Cooldown
+        held_item = get_held_item()
+        if held_item and "_axe" in held_item:
+            base_cooldown = 1.0
+        else:
+            base_cooldown = 0.63
+            
+        ready = (time.time() - self.last_attack_time) >= (base_cooldown + self.next_attack_delay)
+        
+        # 3. Attack Logic
         if dist <= 3.5:
             self.was_chasing = True
             
             # Handle W-Tap Pause
             if self.resume_w_time > 0:
                 if time.time() >= self.resume_w_time:
-                    # Pause finished, resume movement
                     minescript.player_press_forward(True)
                     self.resume_w_time = 0
                     
@@ -342,21 +398,10 @@ class Aimbot:
                             minescript.player_press_left(False)
                             minescript.player_press_right(False)
                 else:
-                    # Still pausing
-                    pass
+                    pass # Pausing
             else:
-                # Not pausing - Chase or Attack
-                held_item = get_held_item()
-                if held_item and "_axe" in held_item:
-                    SWORD_COOLDOWN = 1.0 # Axe Attack Speed
-                else:
-                    SWORD_COOLDOWN = 0.63 # Sword Attack Speed
-                
-                # Calculate required cooldown with randomness
-                current_cooldown = SWORD_COOLDOWN + self.next_attack_delay
-
-                if time.time() - self.last_attack_time >= current_cooldown:
-                    # Attack Sequence
+                # Not pausing
+                if ready:
                     minescript.player_press_forward(True) # Sprint Hit
                     
                     if SETTINGS.get("AIMBOT_ATTACK_ENABLED", True):
@@ -365,17 +410,16 @@ class Aimbot:
                     
                     # W-Tap Logic
                     if SETTINGS.get("AIMBOT_WTAP_ENABLED", True):
-                        minescript.player_press_forward(False) # Stop for W-Tap
+                        minescript.player_press_forward(False)
                         delay = SETTINGS.get("AIMBOT_WTAP_DELAY", 0.15)
                         self.resume_w_time = time.time() + delay
                     
                     self.last_attack_time = time.time()
                     
-                    # Prepare next random delay
+                    # Update Randomness
                     timing_randomness = SETTINGS.get("AIMBOT_TIMING_RANDOMNESS", 0.05)
                     self.next_attack_delay = random.uniform(0, timing_randomness)
                     
-                    # Update Random Offsets (New Spot after hit)
                     randomness = SETTINGS.get("AIMBOT_RANDOMNESS", 0.0)
                     if randomness > 0:
                         self.random_yaw_offset = random.uniform(-randomness, randomness)
@@ -390,6 +434,100 @@ class Aimbot:
             # Target out of attack range but locked on -> Chase
             minescript.player_press_forward(True)
             self.was_chasing = True
+
+class SilentAimbot:
+    def __init__(self):
+        self.active = False
+        self.current_target_name = None
+        self.last_attack_time = 0
+        self.next_attack_delay = 0
+        self.was_key_down = False
+
+    def run(self):
+        if not SETTINGS.get("SILENT_AIMBOT_ENABLED", False): return
+        
+        key = SETTINGS.get("SILENT_AIMBOT_KEY", 0)
+        if key:
+            is_down = is_key_held(key)
+            if is_down and not self.was_key_down:
+                self.active = not self.active
+                log(f"§fSilent Aimbot: {'§aON' if self.active else '§cOFF'}")
+            self.was_key_down = is_down
+
+        if not self.active: return
+        if CURRENT_SCREEN is not None: return
+
+        try:
+            target = self.get_target()
+            if target:
+                self.run_logic(target)
+            else:
+                self.current_target_name = None
+        except: pass
+
+    def get_target(self):
+        # Simple closest target logic
+        try:
+            min_dist = SETTINGS.get("AIMBOT_MIN_DIST", 1.0)
+            enemies = minescript.players(sort='nearest', limit=2, min_distance=min_dist, max_distance=6)
+            if enemies:
+                valid = [e for e in enemies if not e.local]
+                if valid:
+                    return valid[0]
+        except: pass
+        return None
+
+    def run_logic(self, target):
+        pos = target.position
+        my_pos = minescript.player_position()
+        dist = math.sqrt((pos[0] - my_pos[0])**2 + (pos[1] - my_pos[1])**2 + (pos[2] - my_pos[2])**2)
+        
+        if dist > 4.0: return # Out of range
+
+        # Check Cooldown
+        held_item = get_held_item()
+        if held_item and "_axe" in held_item:
+            base_cooldown = 1.0
+        else:
+            base_cooldown = 0.63
+            
+        ready = (time.time() - self.last_attack_time) >= (base_cooldown + self.next_attack_delay)
+        
+        if ready:
+            # Snap & Attack
+            self.aim_at_target(target)
+            
+            if dist <= 3.5:
+                debug_log(f"Silent Aim: Attacking {target.name}")
+                minescript.player_press_attack(True)
+                minescript.player_press_attack(False)
+                self.last_attack_time = time.time()
+                
+                # Randomness for next hit
+                timing_randomness = SETTINGS.get("AIMBOT_TIMING_RANDOMNESS", 0.05)
+                self.next_attack_delay = random.uniform(0, timing_randomness)
+        else:
+            debug_log(f"Silent Aim: Waiting for cooldown (Target: {target.name})")
+
+    def aim_at_target(self, target):
+        # Instant snap for silent aim
+        pos = target.position
+        my_pos = minescript.player_position()
+        
+        dx = pos[0] - my_pos[0]
+        dy = (pos[1] + 1.6) - (my_pos[1] + 1.62)
+        dz = pos[2] - my_pos[2]
+        
+        target_yaw = -math.degrees(math.atan2(dx, dz))
+        horiz_dist = math.sqrt(dx**2 + dz**2)
+        target_pitch = -math.degrees(math.atan2(dy, horiz_dist))
+        
+        minescript.player_set_orientation(target_yaw, target_pitch)
+
+    def aim_at(self, target):
+        # Legacy wrapper if needed, but we replaced calls to this with run_1_8/run_1_21
+        pass
+
 
 
 class Triggerbot:
@@ -756,6 +894,7 @@ def main():
     streamer_mode = StreamerMode()
     esp_manager = ESPManager()
     aimbot = Aimbot()
+    silent_aimbot = SilentAimbot()
     triggerbot = Triggerbot()
     bridge = Bridge()
     breezily = BreezilyBridge()
@@ -797,6 +936,7 @@ def main():
             streamer_mode.run()
             esp_manager.run()
             aimbot.run()
+            silent_aimbot.run()
             triggerbot.run()
             bridge.run()
             breezily.run()
