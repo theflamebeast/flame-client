@@ -71,7 +71,7 @@ def render(draw_context):
             if distance >= min_dist:
                 scale = SETTINGS.get("TEXT_SCALE", 1.0)
                 base = (left + (right - left) * 0.5);
-                draw("outline_text", draw_context, component.literal(name).withStyle(FLAGS), base - (FONT.width(name) * scale * 0.5), top - 10, COLORS["TEXT_COLOR"]);
+                draw("outline_text", draw_context, safe_literal(name).withStyle(FLAGS), base - (FONT.width(name) * scale * 0.5), top - 10, COLORS["TEXT_COLOR"]);
         
         # 4. Draw Weapon
         if SETTINGS["SHOW_WEAPON"]:
@@ -81,6 +81,6 @@ def render(draw_context):
             
             if formatted != "None":
                 base = (left + (right - left) * 0.5);
-                draw("outline_text", draw_context, component.literal(formatted).withStyle(FLAGS), base - (FONT.width(formatted) * scale * 0.5), bottom + 2.1, COLORS["TEXT_COLOR"]);
+                draw("outline_text", draw_context, safe_literal(formatted).withStyle(FLAGS), base - (FONT.width(formatted) * scale * 0.5), bottom + 2.1, COLORS["TEXT_COLOR"]);
 
 EVENT_MANAGER.register("ESP", render);

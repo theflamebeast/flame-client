@@ -18,6 +18,10 @@ import random
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "latest.log")
 
 def log(message):
+    # Streamer Mode Check
+    if SETTINGS.get("STREAMER_MODE", False):
+        return
+
     prefix = [
         {"text": "F", "color": "#FF8600", "bold": True},
         {"text": "l", "color": "#FD791A", "bold": True},
@@ -40,6 +44,10 @@ def log(message):
             timestamp = time.strftime("%H:%M:%S")
             f.write(f"[{timestamp}] {message}\n")
     except: pass
+
+def debug_log(message):
+    if SETTINGS.get("DEBUG_MODE", False):
+        log(f"§e[DEBUG] {message}")
 
 # ==========================================
 #           FEATURE LOGIC
@@ -76,6 +84,17 @@ def find_hotbar_slot(item_name):
     except: pass
     return None
 
+def get_held_item():
+    """Returns the item ID of the currently held item."""
+    try:
+        inventory = minescript.player_inventory()
+        selected_slot = minescript.player_inventory_slot()
+        for item in inventory:
+            if item.slot == selected_slot:
+                return item.item
+    except: pass
+    return None
+
 def is_looking_at_block(keyword, reach=6.0):
     try:
         targeted_block = minescript.player_get_targeted_block(reach)
@@ -92,7 +111,28 @@ def is_looking_at_entity(keyword, reach=6.0):
     except: pass
     return False
 
-class SwordBot:
+class StreamerMode:
+    def __init__(self):
+        self.was_key_down = False
+
+    def run(self):
+        key = SETTINGS.get("STREAMER_MODE_KEY")
+        if key:
+            is_down = is_key_held(key)
+            if is_down and not self.was_key_down:
+                new_state = not SETTINGS.get("STREAMER_MODE", False)
+                SETTINGS["STREAMER_MODE"] = new_state
+                # We can't use log() here because it might be suppressed if we just turned it on
+                # But if we just turned it ON, we probably want to see "Streamer Mode ON" before it goes silent?
+                # Or maybe we just force echo this one message.
+                
+                status = "§aON" if new_state else "§cOFF"
+                # Force echo this message even if streamer mode is on (so user knows they toggled it)
+                minescript.echo(f"§d[FlameClient] §fStreamer Mode: {status}")
+                
+            self.was_key_down = is_down
+
+class Aimbot:
     def __init__(self):
         self.active = False
         self.current_target_name = None
@@ -104,39 +144,66 @@ class SwordBot:
         self.resume_w_time = 0
         self.was_chasing = False
         
-        # Strafe Toggle
-        self.strafe_active = SETTINGS.get("STRAFE_ENABLED", True)
+        # Sub-feature Key States
         self.was_strafe_key_down = False
+        self.was_attack_key_down = False
+        self.was_wtap_key_down = False
+        self.was_axe_key_down = False
         
         # Randomness State
         self.random_yaw_offset = 0
         self.random_pitch_offset = 0
         self.last_random_update = 0
+        self.next_attack_delay = 0
 
     def run(self):
-        if not SETTINGS.get("SWORDBOT_ENABLED", False): return
+        if not SETTINGS.get("AIMBOT_ENABLED", False): return
         
-        # 1. SwordBot Toggle Check
-        key = SETTINGS.get("SWORDBOT_KEY", 0xC0)
+        # 1. Aimbot Toggle Check
+        key = SETTINGS.get("AIMBOT_KEY", 0xC0)
         is_down = is_key_held(key)
         
         if is_down and not self.was_key_down:
             self.active = not self.active
-            log(f"§fSword Bot: {'§aON' if self.active else '§cOFF'}")
+            log(f"§fAimbot: {'§aON' if self.active else '§cOFF'}")
             if not self.active:
                 self.current_target_name = None
                 self.stop_movement()
         self.was_key_down = is_down
 
-        # 2. Strafe Toggle Check
-        strafe_key = SETTINGS.get("STRAFE_KEY", 74) # Default 'J'
-        is_strafe_down = is_key_held(strafe_key)
-        
-        if is_strafe_down and not self.was_strafe_key_down:
-            self.strafe_active = not self.strafe_active
-            SETTINGS["STRAFE_ENABLED"] = self.strafe_active # Update runtime setting
-            log(f"§fStrafing: {'§aON' if self.strafe_active else '§cOFF'}")
-        self.was_strafe_key_down = is_strafe_down
+        # 2. Sub-feature Toggles
+        # Strafe
+        strafe_key = SETTINGS.get("AIMBOT_STRAFE_KEY", 74)
+        if strafe_key:
+            is_strafe_down = is_key_held(strafe_key)
+            if is_strafe_down and not self.was_strafe_key_down:
+                new_state = not SETTINGS.get("AIMBOT_STRAFE_ENABLED", True)
+                SETTINGS["AIMBOT_STRAFE_ENABLED"] = new_state
+                log(f"§fStrafing: {'§aON' if new_state else '§cOFF'}")
+            self.was_strafe_key_down = is_strafe_down
+
+        # Auto Attack
+        attack_key = SETTINGS.get("AIMBOT_ATTACK_KEY")
+        if attack_key:
+            is_attack_down = is_key_held(attack_key)
+            if is_attack_down and not self.was_attack_key_down:
+                new_state = not SETTINGS.get("AIMBOT_ATTACK_ENABLED", True)
+                SETTINGS["AIMBOT_ATTACK_ENABLED"] = new_state
+                log(f"§fAuto Attack: {'§aON' if new_state else '§cOFF'}")
+            self.was_attack_key_down = is_attack_down
+
+        # W-Tap
+        wtap_key = SETTINGS.get("AIMBOT_WTAP_KEY")
+        if wtap_key:
+            is_wtap_down = is_key_held(wtap_key)
+            if is_wtap_down and not self.was_wtap_key_down:
+                new_state = not SETTINGS.get("AIMBOT_WTAP_ENABLED", True)
+                SETTINGS["AIMBOT_WTAP_ENABLED"] = new_state
+                log(f"§fW-Tap: {'§aON' if new_state else '§cOFF'}")
+            self.was_wtap_key_down = is_wtap_down
+
+        # Axe Mode
+        # Removed manual toggle, now auto-detects held item
 
         if not self.active: return
 
@@ -166,18 +233,20 @@ class SwordBot:
         minescript.player_press_attack(False)
 
     def get_target(self):
-        # 1. Try to maintain lock
-        if self.current_target_name:
+        # 1. Try to maintain lock (if Target Mode is OFF)
+        if not SETTINGS.get("AIMBOT_TARGET_MODE", False) and self.current_target_name:
             try:
                 candidates = minescript.players(max_distance=SETTINGS["KEEP_TARGET_DISTANCE"])
                 target = next((p for p in candidates if p.name == self.current_target_name), None)
-                if target: return target
+                if target: 
+                    debug_log(f"Locked: {target.name}")
+                    return target
             except: pass
             self.current_target_name = None
 
-        # 2. Find new target
+        # 2. Find new target (or closest if Target Mode is ON)
         try:
-            min_dist = SETTINGS.get("SWORDBOT_MIN_DIST", 1.0)
+            min_dist = SETTINGS.get("AIMBOT_MIN_DIST", 1.0)
             # Increased limit to 2 to avoid only picking local player
             # Increased max_distance to 6 for better acquisition
             enemies = minescript.players(sort='nearest', limit=2, min_distance=min_dist, max_distance=8)
@@ -185,7 +254,7 @@ class SwordBot:
                 valid = [e for e in enemies if not e.local]
                 if valid:
                     self.current_target_name = valid[0].name
-                    log(f"§fTargeting: §c{self.current_target_name}")
+                    debug_log(f"Acquired: {valid[0].name}")
                     return valid[0]
         except: pass
         return None
@@ -199,14 +268,16 @@ class SwordBot:
                          (pos[1] - my_pos[1])**2 + 
                          (pos[2] - my_pos[2])**2)
         
-        min_dist = SETTINGS.get("SWORDBOT_MIN_DIST", 1.0)
+        debug_log(f"Aiming: {target.name} Dist: {dist:.2f}")
+
+        min_dist = SETTINGS.get("AIMBOT_MIN_DIST", 1.0)
         if dist < min_dist:
             self.stop_movement()
             return
 
         # Aim Logic with Intensity (Smoothing)
-        intensity = SETTINGS.get("SWORDBOT_INTENSITY", 5.0)
-        randomness = SETTINGS.get("SWORDBOT_RANDOMNESS", 0.0)
+        intensity = SETTINGS.get("AIMBOT_INTENSITY", 5.0)
+        randomness = SETTINGS.get("AIMBOT_RANDOMNESS", 0.0)
         
         # Random offsets are now updated after each hit (see below)
 
@@ -259,7 +330,7 @@ class SwordBot:
                     self.resume_w_time = 0
                     
                     # Change strafe direction
-                    if self.strafe_active:
+                    if SETTINGS.get("AIMBOT_STRAFE_ENABLED", True):
                         strafe = random.choice(['left', 'right', 'stop'])
                         if strafe == 'left':
                             minescript.player_press_left(True)
@@ -275,23 +346,37 @@ class SwordBot:
                     pass
             else:
                 # Not pausing - Chase or Attack
-                if SETTINGS.get("SWORDBOT_AXE_MODE", False):
+                held_item = get_held_item()
+                if held_item and "_axe" in held_item:
                     SWORD_COOLDOWN = 1.0 # Axe Attack Speed
                 else:
                     SWORD_COOLDOWN = 0.63 # Sword Attack Speed
                 
-                if time.time() - self.last_attack_time >= SWORD_COOLDOWN:
+                # Calculate required cooldown with randomness
+                current_cooldown = SWORD_COOLDOWN + self.next_attack_delay
+
+                if time.time() - self.last_attack_time >= current_cooldown:
                     # Attack Sequence
                     minescript.player_press_forward(True) # Sprint Hit
-                    minescript.player_press_attack(True)
-                    minescript.player_press_attack(False)
-                    minescript.player_press_forward(False) # Stop for W-Tap
+                    
+                    if SETTINGS.get("AIMBOT_ATTACK_ENABLED", True):
+                        minescript.player_press_attack(True)
+                        minescript.player_press_attack(False)
+                    
+                    # W-Tap Logic
+                    if SETTINGS.get("AIMBOT_WTAP_ENABLED", True):
+                        minescript.player_press_forward(False) # Stop for W-Tap
+                        delay = SETTINGS.get("AIMBOT_WTAP_DELAY", 0.15)
+                        self.resume_w_time = time.time() + delay
                     
                     self.last_attack_time = time.time()
-                    self.resume_w_time = time.time() + 0.15 # 150ms pause
+                    
+                    # Prepare next random delay
+                    timing_randomness = SETTINGS.get("AIMBOT_TIMING_RANDOMNESS", 0.05)
+                    self.next_attack_delay = random.uniform(0, timing_randomness)
                     
                     # Update Random Offsets (New Spot after hit)
-                    randomness = SETTINGS.get("SWORDBOT_RANDOMNESS", 0.0)
+                    randomness = SETTINGS.get("AIMBOT_RANDOMNESS", 0.0)
                     if randomness > 0:
                         self.random_yaw_offset = random.uniform(-randomness, randomness)
                         self.random_pitch_offset = random.uniform(-randomness, randomness)
@@ -335,20 +420,82 @@ class Triggerbot:
             # Check if looking at entity
             targeted_entity = minescript.player_get_targeted_entity(3.0)
             if targeted_entity and targeted_entity.type:
+                debug_log(f"Triggerbot looking at: {targeted_entity.type}")
                 if "player" in targeted_entity.type.lower(): # Loose match
                     # Cooldown Check
-                    SWORD_COOLDOWN = 0.63 # ~1.6 Attack Speed
-                    if time.time() - self.last_attack_time >= SWORD_COOLDOWN:
-                        minescript.player_press_attack(True)
-                        time.sleep(0.05) # Hold for 50ms
-                        minescript.player_press_attack(False)
-                        self.last_attack_time = time.time()
+                    if SETTINGS.get("TRIGGERBOT_1_8_MODE", False):
+                        # 1.8 Spam Click Mode (12-15 CPS)
+                        if time.time() - self.last_attack_time >= 0.07:
+                            minescript.player_press_attack(True)
+                            minescript.player_press_attack(False)
+                            self.last_attack_time = time.time()
+                            debug_log("Triggerbot: Attack (1.8)")
+                    else:
+                        # Modern Cooldown Mode
+                        held_item = get_held_item()
+                        if held_item and "_axe" in held_item:
+                            SWORD_COOLDOWN = 1.0 # Axe Attack Speed
+                        else:
+                            SWORD_COOLDOWN = 0.63 # Sword Attack Speed
+                            
+                        if time.time() - self.last_attack_time >= SWORD_COOLDOWN:
+                            minescript.player_press_attack(True)
+                            time.sleep(0.05) # Hold for 50ms
+                            minescript.player_press_attack(False)
+                            self.last_attack_time = time.time()
+                            debug_log("Triggerbot: Attack (Modern)")
         except: pass
+
+
+class AttributeSwap:
+    def __init__(self):
+        self.active = False
+        self.was_key_down = False
+        self.last_swap_time = 0
+        self.cooldown = 0.3
+
+    def run(self):
+        if not SETTINGS.get("ATTRIBUTE_SWAP_ENABLED", False): return
+        
+        key = SETTINGS.get("ATTRIBUTE_SWAP_KEY", 89) # Default 'Y'
+        is_down = is_key_held(key)
+        
+        if is_down and not self.was_key_down:
+            if time.time() - self.last_swap_time >= self.cooldown:
+                self.last_swap_time = time.time()
+                threading.Thread(target=self.swap_sequence).start()
+        
+        self.was_key_down = is_down
+
+    def swap_sequence(self):
+        try:
+            # Find weapon (Spear or Mace)
+            inventory = minescript.player_inventory()
+            weapon_slot = None
+            for item in inventory:
+                if item.slot is not None and 0 <= item.slot <= 8 and item.item is not None:
+                    if item.item.endswith('_spear') or item.item == 'minecraft:mace':
+                        weapon_slot = item.slot
+                        break
+            
+            if weapon_slot is not None:
+                minescript.player_inventory_select_slot(weapon_slot)
+            else:
+                minescript.player_inventory_select_slot(7) # Fallback
+            
+            minescript.player_press_attack(True)
+            time.sleep(0.15)
+            minescript.player_press_attack(False)
+            
+            minescript.player_inventory_select_slot(0)
+            debug_log("Attribute Swap: Executed")
+        except Exception as e:
+            debug_log(f"Attribute Swap Error: {e}")
 
 
 class Bridge:
     def run(self):
-        if not SETTINGS["BRIDGE_ENABLED"]: return
+        if not SETTINGS.get("BRIDGING_ENABLED", False): return
         
         key = SETTINGS.get("BRIDGE_KEY", 0x33)
         if is_key_held(key):
@@ -359,6 +506,7 @@ class Bridge:
             bx, by, bz = int(math.floor(x)), int(math.floor(y - 1)), int(math.floor(z))
             
             block = minescript.get_block(bx, by, bz)
+            debug_log(f"Bridge: Block below is {block}")
             if "air" in block:
                 minescript.player_press_sneak(True)
                 minescript.player_press_use(True)
@@ -373,7 +521,7 @@ class BreezilyBridge:
         self.last_place_time = 0
 
     def run(self):
-        if not SETTINGS.get("GODBRIDGE_ENABLED", False): return
+        if not SETTINGS.get("BRIDGING_ENABLED", False): return
         
         key = SETTINGS.get("GODBRIDGE_KEY", 0x47)
         if is_key_held(key):
@@ -440,12 +588,14 @@ class AutoAnchor:
             if is_looking_at_block("respawn_anchor"):
                 self.executing = True
                 log("§eAnchor detected! §fCharging...")
+                debug_log("Anchor: Starting sequence")
                 threading.Thread(target=self.sequence).start()
 
     def sequence(self):
         try:
             glowstone_slot = find_hotbar_slot("glowstone")
             if glowstone_slot is not None:
+                debug_log(f"Anchor: Found glowstone at slot {glowstone_slot}")
                 minescript.player_inventory_select_slot(glowstone_slot)
                 time.sleep(0.05)
                 
@@ -483,9 +633,11 @@ class AutoAnchor:
                     minescript.player_press_use(False)
                     
                     log("§cBOOM! §fAnchor exploded.")
+                    debug_log("Anchor: Sequence complete")
                     self.last_anchor_time = time.time()
         except Exception as e:
             print(f"Anchor Error: {e}")
+            debug_log(f"Anchor Error: {e}")
         finally:
             self.executing = False
 
@@ -518,17 +670,20 @@ class AutoCrystal:
         if is_looking_at_entity("end_crystal"):
             # Removed delay for instant reaction
             self.executing = True
+            debug_log("Crystal: Detected crystal, exploding")
             threading.Thread(target=self.explode_sequence).start()
         
         # Place (Low Priority)
         elif is_looking_at_block("obsidian"):
             self.executing = True
+            debug_log("Crystal: Detected obsidian, placing")
             threading.Thread(target=self.place_sequence).start()
 
     def place_sequence(self):
         try:
             crystal_slot = find_hotbar_slot("end_crystal")
             if crystal_slot is not None:
+                debug_log(f"Crystal: Placing from slot {crystal_slot}")
                 minescript.player_inventory_select_slot(crystal_slot)
                 
                 minescript.player_press_use(True)
@@ -544,6 +699,7 @@ class AutoCrystal:
         try:
             sword_slot = find_hotbar_slot("sword")
             if sword_slot is not None:
+                debug_log(f"Crystal: Exploding with slot {sword_slot}")
                 minescript.player_inventory_select_slot(sword_slot)
                 
                 minescript.player_press_attack(True)
@@ -560,6 +716,33 @@ class AutoCrystal:
 #           MAIN LOOP
 # ==========================================
 
+class ESPManager:
+    def __init__(self):
+        self.was_key_down = False
+        self.last_state = SETTINGS.get("ESP_ENABLED", False)
+
+    def run(self):
+        # Key Toggle
+        key = SETTINGS.get("ESP_KEY")
+        if key:
+            is_down = is_key_held(key)
+            if is_down and not self.was_key_down:
+                new_state = not SETTINGS.get("ESP_ENABLED", False)
+                SETTINGS["ESP_ENABLED"] = new_state
+                log(f"§fESP: {'§aON' if new_state else '§cOFF'}")
+                
+                # Trigger Minescript execution if enabled
+                if new_state:
+                    minescript.execute(r"\FlameClient\ESP\main")
+            self.was_key_down = is_down
+        
+        # Check for external state change (e.g. from menu)
+        current_state = SETTINGS.get("ESP_ENABLED", False)
+        if current_state != self.last_state:
+            if current_state:
+                minescript.execute(r"\FlameClient\ESP\main")
+            self.last_state = current_state
+
 def main():
     global SETTINGS
     log("§fCore Loaded!")
@@ -570,12 +753,15 @@ def main():
         log("§fESP Started.")
 
     # 2. Initialize Features
-    swordbot = SwordBot()
+    streamer_mode = StreamerMode()
+    esp_manager = ESPManager()
+    aimbot = Aimbot()
     triggerbot = Triggerbot()
     bridge = Bridge()
     breezily = BreezilyBridge()
     anchor = AutoAnchor()
     crystal = AutoCrystal()
+    attr_swap = AttributeSwap()
 
     # Menu State
     menu_visible = True
@@ -608,12 +794,15 @@ def main():
 
             CURRENT_SCREEN = minescript.screen_name()
             
-            swordbot.run()
+            streamer_mode.run()
+            esp_manager.run()
+            aimbot.run()
             triggerbot.run()
             bridge.run()
             breezily.run()
             anchor.run()
             crystal.run()
+            attr_swap.run()
             
             time.sleep(0.01) # 100 ticks/sec roughly
         except Exception as e:

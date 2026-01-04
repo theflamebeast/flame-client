@@ -1,6 +1,14 @@
 from FlameClient.ESP.imports import *;
 from FlameClient.config import COLORS, SETTINGS;
 
+def make_color(a, r, g, b):
+    # Manual ARGB packing to avoid class resolution issues
+    val = (a << 24) | (r << 16) | (g << 8) | b
+    # Convert to signed 32-bit int for Java
+    if val > 0x7FFFFFFF:
+        val -= 0x100000000
+    return val
+
 def parse_color(hex_str):
     if not isinstance(hex_str, str): return hex_str
     hex_str = hex_str.lstrip('#')
@@ -16,7 +24,7 @@ def parse_color(hex_str):
         b = int(hex_str[4:6], 16)
     else:
         return 0xFFFFFFFF
-    return argb.color(a, r, g, b)
+    return make_color(a, r, g, b)
 
 def update_colors():
     for key in COLORS:
@@ -25,16 +33,57 @@ def update_colors():
 # Initial load
 update_colors()
 
-FLAGS = style.EMPTY.withShadowColor(0xFFFFFF);
+def safe_literal(text):
+    try:
+        return component.literal(text)
+    except:
+        try:
+            return component.method_43470(text)
+        except:
+            return component.literal(text)
 
-MINECRAFT = minecraft_class.getInstance();
-WINDOW = MINECRAFT.getWindow();
+try:
+    _empty_style = style.EMPTY
+except:
+    try:
+        _empty_style = style.field_24360
+    except:
+        _empty_style = safe_literal("").getStyle()
 
-GAME_RENDERER = MINECRAFT.gameRenderer;
-LEVEL = MINECRAFT.level;
+try:
+    FLAGS = _empty_style.withShadowColor(0xFFFFFF)
+except:
+    FLAGS = _empty_style
 
-OPTIONS = MINECRAFT.options;
-FONT = MINECRAFT.font;
+try:
+    MINECRAFT = minecraft_class.getInstance()
+except:
+    MINECRAFT = minecraft_class.method_1551()
+
+try:
+    WINDOW = MINECRAFT.getWindow()
+except:
+    WINDOW = MINECRAFT.method_22683()
+
+try:
+    GAME_RENDERER = MINECRAFT.gameRenderer
+except:
+    GAME_RENDERER = MINECRAFT.field_1773
+
+try:
+    LEVEL = MINECRAFT.level
+except:
+    LEVEL = MINECRAFT.field_1687
+
+try:
+    OPTIONS = MINECRAFT.options
+except:
+    OPTIONS = MINECRAFT.field_1690
+
+try:
+    FONT = MINECRAFT.font
+except:
+    FONT = MINECRAFT.field_1772
 
 # Access protected field for font manager if needed (kept from original)
 try:

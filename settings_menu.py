@@ -15,6 +15,33 @@ if minescript_root not in sys.path:
 
 from FlameClient.config import SETTINGS, COLORS
 
+# --- KEY MAPPING ---
+VK_CODE_MAP = {
+    1: "LBUTTON", 2: "RBUTTON", 4: "MBUTTON", 5: "XBUTTON1", 6: "XBUTTON2",
+    8: "BACKSPACE", 9: "TAB", 13: "ENTER", 16: "SHIFT", 17: "CTRL", 18: "ALT",
+    19: "PAUSE", 20: "CAPSLOCK", 27: "ESC", 32: "SPACE", 33: "PGUP", 34: "PGDN",
+    35: "END", 36: "HOME", 37: "LEFT", 38: "UP", 39: "RIGHT", 40: "DOWN",
+    44: "PRTSC", 45: "INSERT", 46: "DELETE",
+    48: "0", 49: "1", 50: "2", 51: "3", 52: "4", 53: "5", 54: "6", 55: "7", 56: "8", 57: "9",
+    65: "A", 66: "B", 67: "C", 68: "D", 69: "E", 70: "F", 71: "G", 72: "H", 73: "I",
+    74: "J", 75: "K", 76: "L", 77: "M", 78: "N", 79: "O", 80: "P", 81: "Q", 82: "R",
+    83: "S", 84: "T", 85: "U", 86: "V", 87: "W", 88: "X", 89: "Y", 90: "Z",
+    91: "LWIN", 92: "RWIN", 93: "APPS",
+    96: "NUM0", 97: "NUM1", 98: "NUM2", 99: "NUM3", 100: "NUM4", 101: "NUM5",
+    102: "NUM6", 103: "NUM7", 104: "NUM8", 105: "NUM9",
+    106: "NUM*", 107: "NUM+", 109: "NUM-", 110: "NUM.", 111: "NUM/",
+    112: "F1", 113: "F2", 114: "F3", 115: "F4", 116: "F5", 117: "F6",
+    118: "F7", 119: "F8", 120: "F9", 121: "F10", 122: "F11", 123: "F12",
+    144: "NUMLOCK", 145: "SCROLL",
+    160: "LSHIFT", 161: "RSHIFT", 162: "LCTRL", 163: "RCTRL", 164: "LALT", 165: "RALT",
+    186: ";", 187: "=", 188: ",", 189: "-", 190: ".", 191: "/", 192: "`",
+    219: "[", 220: "\\", 221: "]", 222: "'"
+}
+
+def get_key_name(vk_code):
+    if vk_code is None: return "None"
+    return VK_CODE_MAP.get(vk_code, f"Key_{vk_code}")
+
 # --- THEME SETUP ---
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -150,9 +177,9 @@ class SettingsApp(ctk.CTk):
         self.save_timer = None
         
         # Create Windows
-        self.combat_window = BaseWindow(self, "Combat", "300x600")
-        self.utility_window = BaseWindow(self, "Utility", "300x600")
-        self.console_window = BaseWindow(self, "Console", "400x600")
+        self.combat_window = BaseWindow(self, "Combat", "300x800")
+        self.utility_window = BaseWindow(self, "Utility", "300x800")
+        self.console_window = BaseWindow(self, "Console", "400x800")
         
         self.windows = [self.combat_window, self.utility_window, self.console_window]
         
@@ -165,9 +192,9 @@ class SettingsApp(ctk.CTk):
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         
-        self.combat_window.geometry(f"+{screen_width//2 - 460}+{screen_height//2 - 300}")
-        self.utility_window.geometry(f"+{screen_width//2 - 150}+{screen_height//2 - 300}")
-        self.console_window.geometry(f"+{screen_width//2 + 160}+{screen_height//2 - 300}")
+        self.combat_window.geometry(f"+{screen_width//2 - 460}+{screen_height//2 - 400}")
+        self.utility_window.geometry(f"+{screen_width//2 - 150}+{screen_height//2 - 400}")
+        self.console_window.geometry(f"+{screen_width//2 + 160}+{screen_height//2 - 400}")
 
         # Input State
         self.was_rshift_down = False
@@ -209,9 +236,9 @@ class SettingsApp(ctk.CTk):
         content_esp = self.combat_window.add_collapsible_section(self.combat_window, "ESP")
         self.setup_esp_section(content_esp, self.combat_window)
         
-        # Sword Bot
-        content_sword = self.combat_window.add_collapsible_section(self.combat_window, "SWORD BOT")
-        self.setup_swordbot_section(content_sword, self.combat_window)
+        # Aimbot
+        content_aim = self.combat_window.add_collapsible_section(self.combat_window, "AIMBOT")
+        self.setup_aimbot_section(content_aim, self.combat_window)
 
         # Triggerbot
         content_trigger = self.combat_window.add_collapsible_section(self.combat_window, "TRIGGERBOT")
@@ -225,14 +252,14 @@ class SettingsApp(ctk.CTk):
         content_crystal = self.combat_window.add_collapsible_section(self.combat_window, "AUTO CRYSTAL")
         self.setup_crystal_section(content_crystal, self.combat_window)
 
-    def setup_utility(self):
-        # Bridge
-        content_bridge = self.utility_window.add_collapsible_section(self.utility_window, "AUTO SPEED BRIDGE")
-        self.setup_bridge_section(content_bridge, self.utility_window)
+    def setup_utility(self, parent=None, window=None):
+        # Bridging
+        content_bridge = self.utility_window.add_collapsible_section(self.utility_window, "AUTO BRIDGING")
+        self.setup_bridging_section(content_bridge, self.utility_window)
 
-        # God Bridge
-        content_god = self.utility_window.add_collapsible_section(self.utility_window, "BREEZILY BRIDGE")
-        self.setup_godbridge_section(content_god, self.utility_window)
+        # Attribute Swap
+        content_swap = self.utility_window.add_collapsible_section(self.utility_window, "ATTRIBUTE SWAP")
+        self.setup_attribute_swap_section(content_swap, self.utility_window)
 
         # Menu Settings
         content_menu = self.utility_window.add_collapsible_section(self.utility_window, "MENU SETTINGS")
@@ -312,7 +339,8 @@ class SettingsApp(ctk.CTk):
     # --- SECTIONS ---
 
     def setup_esp_section(self, parent, window):
-        window.add_switch(parent, "Enabled", "ESP_ENABLED")
+        window.add_button(parent, lambda: self.get_key_text("ESP_KEY", "ESP Key"), lambda: self.update_keybind("ESP_KEY"))
+        window.add_switch(parent, "Enable Module", "ESP_ENABLED")
         window.add_switch(parent, "Boxes", "SHOW_BOX")
         window.add_switch(parent, "Health", "SHOW_HEALTH")
         window.add_switch(parent, "Nametags", "SHOW_NAME")
@@ -327,39 +355,57 @@ class SettingsApp(ctk.CTk):
         window.add_button(parent, lambda: "Box Color", lambda: self.update_color("BOX_COLOR"), color="#333333")
         window.add_slider(parent, "Box Alpha", "BOX_ALPHA", 0, 100, steps=100, is_int=True)
 
-    def setup_swordbot_section(self, parent, window):
-        window.add_switch(parent, "Enabled", "SWORDBOT_ENABLED")
-        window.add_switch(parent, "Axe Mode", "SWORDBOT_AXE_MODE")
-        window.add_slider(parent, "Intensity", "SWORDBOT_INTENSITY", 0.1, 5.0, steps=49, warning_text="Warning: High risk of getting flagged")
+    def setup_aimbot_section(self, parent, window):
+        window.add_button(parent, lambda: self.get_key_text("AIMBOT_KEY", "Aimbot Key"), lambda: self.update_keybind("AIMBOT_KEY"))
         
-        window.add_slider(parent, "Min Dist", "SWORDBOT_MIN_DIST", 0.0, 5.0, steps=50)
-        window.add_slider(parent, "Randomness", "SWORDBOT_RANDOMNESS", 0.0, 30.0, steps=300, warning_text="How much the aim can deviate", warning_color="#AAAAAA")
+        # Keybinds for sub-features (Moved to top)
+        window.add_button(parent, lambda: self.get_key_text("AIMBOT_ATTACK_KEY", "Auto-Attack Key"), lambda: self.update_keybind("AIMBOT_ATTACK_KEY"))
+        window.add_button(parent, lambda: self.get_key_text("AIMBOT_WTAP_KEY", "W-Tap Key"), lambda: self.update_keybind("AIMBOT_WTAP_KEY"))
+        window.add_button(parent, lambda: self.get_key_text("AIMBOT_STRAFE_KEY", "Strafe Key"), lambda: self.update_keybind("AIMBOT_STRAFE_KEY"))
         
-        window.add_button(parent, lambda: self.get_key_text("SWORDBOT_KEY", "Sword Key"), lambda: self.update_keybind("SWORDBOT_KEY"))
-        window.add_button(parent, lambda: self.get_key_text("STRAFE_KEY", "Strafe Key"), lambda: self.update_keybind("STRAFE_KEY"))
+        window.add_switch(parent, "Enable Module", "AIMBOT_ENABLED")
+        
+        window.add_switch(parent, "Target Mode (ON=Closest, OFF=Lock)", "AIMBOT_TARGET_MODE")
+        
+        # Sub-features
+        window.add_switch(parent, "Auto Attack", "AIMBOT_ATTACK_ENABLED")
+        window.add_switch(parent, "W-Tap", "AIMBOT_WTAP_ENABLED")
+        window.add_switch(parent, "Strafe", "AIMBOT_STRAFE_ENABLED")
+        
+        window.add_slider(parent, "W-Tap Delay", "AIMBOT_WTAP_DELAY", 0.0, 1.0, steps=20)
+        window.add_slider(parent, "Intensity", "AIMBOT_INTENSITY", 0.1, 5.0, steps=49)
+        
+        window.add_slider(parent, "Min Dist", "AIMBOT_MIN_DIST", 0.0, 5.0, steps=50)
+        window.add_slider(parent, "Aim Randomness", "AIMBOT_RANDOMNESS", 0.0, 30.0, steps=300)
+        window.add_slider(parent, "Timing Randomness", "AIMBOT_TIMING_RANDOMNESS", 0.0, 0.2, steps=20)
 
     def setup_triggerbot_section(self, parent, window):
-        window.add_switch(parent, "Enabled", "TRIGGERBOT_ENABLED")
         window.add_button(parent, lambda: self.get_key_text("TRIGGERBOT_KEY", "Trigger Key"), lambda: self.update_keybind("TRIGGERBOT_KEY"))
+        window.add_switch(parent, "Enable Module", "TRIGGERBOT_ENABLED")
+        window.add_switch(parent, "1.8 Mode", "TRIGGERBOT_1_8_MODE")
 
-    def setup_bridge_section(self, parent, window):
-        window.add_switch(parent, "Enabled", "BRIDGE_ENABLED")
-        window.add_button(parent, lambda: self.get_key_text("BRIDGE_KEY", "Bridge Key"), lambda: self.update_keybind("BRIDGE_KEY"))
-
-    def setup_godbridge_section(self, parent, window):
-        window.add_switch(parent, "Enabled", "GODBRIDGE_ENABLED")
+    def setup_bridging_section(self, parent, window):
+        window.add_button(parent, lambda: self.get_key_text("BRIDGE_KEY", "Speed Bridge Key"), lambda: self.update_keybind("BRIDGE_KEY"))
         window.add_button(parent, lambda: self.get_key_text("GODBRIDGE_KEY", "Breezily Key"), lambda: self.update_keybind("GODBRIDGE_KEY"))
+        window.add_switch(parent, "Enable Module", "BRIDGING_ENABLED")
+
+    def setup_attribute_swap_section(self, parent, window):
+        window.add_button(parent, lambda: self.get_key_text("ATTRIBUTE_SWAP_KEY", "Swap Key"), lambda: self.update_keybind("ATTRIBUTE_SWAP_KEY"))
+        window.add_switch(parent, "Enable Module", "ATTRIBUTE_SWAP_ENABLED")
 
     def setup_anchor_section(self, parent, window):
-        window.add_switch(parent, "Enabled", "ANCHOR_ENABLED")
         window.add_button(parent, lambda: self.get_key_text("ANCHOR_KEY", "Anchor Key"), lambda: self.update_keybind("ANCHOR_KEY"))
+        window.add_switch(parent, "Enable Module", "ANCHOR_ENABLED")
 
     def setup_crystal_section(self, parent, window):
-        window.add_switch(parent, "Enabled", "CRYSTAL_ENABLED")
         window.add_button(parent, lambda: self.get_key_text("CRYSTAL_KEY", "Crystal Key"), lambda: self.update_keybind("CRYSTAL_KEY"))
+        window.add_switch(parent, "Enable Module", "CRYSTAL_ENABLED")
 
     def setup_menu_section(self, parent, window):
         window.add_slider(parent, "Menu Opacity", "MENU_OPACITY", 0.2, 1.0, steps=80)
+        window.add_switch(parent, "Debug Mode", "DEBUG_MODE")
+        window.add_switch(parent, "Streamer Mode", "STREAMER_MODE")
+        window.add_button(parent, lambda: self.get_key_text("STREAMER_MODE_KEY", "Streamer Mode Key"), lambda: self.update_keybind("STREAMER_MODE_KEY"))
 
     # --- LOGIC ---
 
@@ -370,7 +416,7 @@ class SettingsApp(ctk.CTk):
 
     def get_key_text(self, key, label):
         code = SETTINGS.get(key)
-        return f"{label}: {code if code else 'None'}"
+        return f"{label}: {get_key_name(code)}"
 
     def update_keybind(self, key_setting):
         top = ctk.CTkToplevel(self)

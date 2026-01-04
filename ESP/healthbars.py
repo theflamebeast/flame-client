@@ -13,7 +13,7 @@ def get_health_color(health, max_health):
     g = int(ratio * 255)
     b = 0
     
-    return argb.color(255, r, g, b)
+    return make_color(255, r, g, b)
 
 def draw(draw_context, entity, left, top, right, bottom):
     if not SETTINGS["SHOW_HEALTH"]:
