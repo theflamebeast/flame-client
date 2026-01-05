@@ -172,16 +172,6 @@ class Aimbot:
         self.was_key_down = is_down
 
         # 2. Sub-feature Toggles
-        # Strafe
-        strafe_key = SETTINGS.get("AIMBOT_STRAFE_KEY", 74)
-        if strafe_key:
-            is_strafe_down = is_key_held(strafe_key)
-            if is_strafe_down and not self.was_strafe_key_down:
-                new_state = not SETTINGS.get("AIMBOT_STRAFE_ENABLED", True)
-                SETTINGS["AIMBOT_STRAFE_ENABLED"] = new_state
-                log(f"§fStrafing: {'§aON' if new_state else '§cOFF'}")
-            self.was_strafe_key_down = is_strafe_down
-
         # Auto Attack
         attack_key = SETTINGS.get("AIMBOT_ATTACK_KEY")
         if attack_key:
@@ -191,16 +181,6 @@ class Aimbot:
                 SETTINGS["AIMBOT_ATTACK_ENABLED"] = new_state
                 log(f"§fAuto Attack: {'§aON' if new_state else '§cOFF'}")
             self.was_attack_key_down = is_attack_down
-
-        # W-Tap
-        wtap_key = SETTINGS.get("AIMBOT_WTAP_KEY")
-        if wtap_key:
-            is_wtap_down = is_key_held(wtap_key)
-            if is_wtap_down and not self.was_wtap_key_down:
-                new_state = not SETTINGS.get("AIMBOT_WTAP_ENABLED", True)
-                SETTINGS["AIMBOT_WTAP_ENABLED"] = new_state
-                log(f"§fW-Tap: {'§aON' if new_state else '§cOFF'}")
-            self.was_wtap_key_down = is_wtap_down
 
         # Axe Mode
         # Removed manual toggle, now auto-detects held item
@@ -556,7 +536,8 @@ class Triggerbot:
         # Logic
         try:
             # Check if looking at entity
-            targeted_entity = minescript.player_get_targeted_entity(3.0)
+            reach = SETTINGS.get("TRIGGERBOT_REACH", 3.0)
+            targeted_entity = minescript.player_get_targeted_entity(reach)
             if targeted_entity and targeted_entity.type:
                 debug_log(f"Triggerbot looking at: {targeted_entity.type}")
                 if "player" in targeted_entity.type.lower(): # Loose match
@@ -653,51 +634,7 @@ class Bridge:
                 minescript.player_press_sneak(False)
 
 
-class BreezilyBridge:
-    def __init__(self):
-        self.was_active = False
-        self.last_place_time = 0
 
-    def run(self):
-        if not SETTINGS.get("BRIDGING_ENABLED", False): return
-        
-        key = SETTINGS.get("GODBRIDGE_KEY", 0x47)
-        if is_key_held(key):
-            if not self.was_active:
-                # 1. Snap Yaw to nearest 90 degrees (Cardinal for Witchly)
-                yaw, pitch = minescript.player_orientation()
-                snapped_yaw = round(yaw / 90) * 90
-                
-                # 2. Set Pitch
-                minescript.player_set_orientation(snapped_yaw, 80)
-            
-            self.was_active = True
-            
-            # 3. Move Backward (S)
-            minescript.player_press_forward(False)
-            minescript.player_press_backward(True)
-            
-            # 4. Alternate A (Left) and D (Right)
-            # Cycle: 0.4s total (0.2s Left, 0.2s Right) - Slower strafe for Breezily
-            cycle = time.time() % 0.4
-            if cycle < 0.2:
-                minescript.player_press_left(True)
-                minescript.player_press_right(False)
-            else:
-                minescript.player_press_left(False)
-                minescript.player_press_right(True)
-            
-            # 5. Timed Place
-            if time.time() - self.last_place_time >= 0.001:
-                minescript.player_press_use(True)
-                minescript.player_press_use(False)
-                self.last_place_time = time.time()
-        else:
-            if self.was_active:
-                minescript.player_press_backward(False)
-                minescript.player_press_left(False)
-                minescript.player_press_right(False)
-                self.was_active = False
 
 
 class AutoAnchor:
@@ -897,7 +834,6 @@ def main():
     silent_aimbot = SilentAimbot()
     triggerbot = Triggerbot()
     bridge = Bridge()
-    breezily = BreezilyBridge()
     anchor = AutoAnchor()
     crystal = AutoCrystal()
     attr_swap = AttributeSwap()
@@ -939,7 +875,6 @@ def main():
             silent_aimbot.run()
             triggerbot.run()
             bridge.run()
-            breezily.run()
             anchor.run()
             crystal.run()
             attr_swap.run()

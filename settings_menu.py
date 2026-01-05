@@ -399,8 +399,6 @@ class SettingsApp(ctk.CTk):
         
         # Keybinds for sub-features (Moved to top)
         window.add_button(parent, lambda: self.get_key_text("AIMBOT_ATTACK_KEY", "Auto-Attack Key"), lambda: self.update_keybind("AIMBOT_ATTACK_KEY"))
-        window.add_button(parent, lambda: self.get_key_text("AIMBOT_WTAP_KEY", "W-Tap Key"), lambda: self.update_keybind("AIMBOT_WTAP_KEY"))
-        window.add_button(parent, lambda: self.get_key_text("AIMBOT_STRAFE_KEY", "Strafe Key"), lambda: self.update_keybind("AIMBOT_STRAFE_KEY"))
         
         window.add_switch(parent, "Enable Module", "AIMBOT_ENABLED")
         
@@ -430,11 +428,13 @@ class SettingsApp(ctk.CTk):
         window.add_button(parent, lambda: self.get_key_text("TRIGGERBOT_KEY", "Trigger Key"), lambda: self.update_keybind("TRIGGERBOT_KEY"))
         window.add_switch(parent, "Enable Module", "TRIGGERBOT_ENABLED")
         window.add_switch(parent, "1.8 Mode", "TRIGGERBOT_1_8_MODE")
+        window.add_slider(parent, "Reach", "TRIGGERBOT_REACH", 3.0, 6.0, steps=30)
 
     def setup_bridging_section(self, parent, window):
         window.add_button(parent, lambda: self.get_key_text("BRIDGE_KEY", "Speed Bridge Key"), lambda: self.update_keybind("BRIDGE_KEY"))
-        window.add_button(parent, lambda: self.get_key_text("GODBRIDGE_KEY", "Breezily Key"), lambda: self.update_keybind("GODBRIDGE_KEY"))
         window.add_switch(parent, "Enable Module", "BRIDGING_ENABLED")
+
+
 
     def setup_attribute_swap_section(self, parent, window):
         window.add_button(parent, lambda: self.get_key_text("ATTRIBUTE_SWAP_KEY", "Swap Key"), lambda: self.update_keybind("ATTRIBUTE_SWAP_KEY"))
