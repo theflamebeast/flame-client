@@ -339,6 +339,13 @@ class SettingsApp(ctk.CTk):
                         self.console_textbox.insert("end", new_content)
                         self.console_textbox.see("end")
                         self.console_textbox.configure(state="disabled")
+
+                        # Auto Reload Checks
+                        if SETTINGS.get("AUTO_RELOAD_ON_SERVER_SWITCH", False):
+                            if "[Render thread/INFO]: Connecting to" in new_content or "Connecting to" in new_content:
+                                print("Detected server switch, triggering reload sequence in 5s...")
+                                self.after(5000, self.reload_jobs)
+
                 elif current_size < self.last_log_size:
                      # File was truncated/reset
                      self.last_log_size = 0
@@ -428,6 +435,7 @@ class SettingsApp(ctk.CTk):
         window.add_button(parent, lambda: self.get_key_text("TRIGGERBOT_KEY", "Trigger Key"), lambda: self.update_keybind("TRIGGERBOT_KEY"))
         window.add_switch(parent, "Enable Module", "TRIGGERBOT_ENABLED")
         window.add_switch(parent, "1.8 Mode", "TRIGGERBOT_1_8_MODE")
+        window.add_switch(parent, "Axe Mode (Modern)", "TRIGGERBOT_AXE_MODE")
         window.add_slider(parent, "Reach", "TRIGGERBOT_REACH", 3.0, 6.0, steps=30)
 
     def setup_bridging_section(self, parent, window):
@@ -447,12 +455,14 @@ class SettingsApp(ctk.CTk):
     def setup_crystal_section(self, parent, window):
         window.add_button(parent, lambda: self.get_key_text("CRYSTAL_KEY", "Crystal Key"), lambda: self.update_keybind("CRYSTAL_KEY"))
         window.add_switch(parent, "Enable Module", "CRYSTAL_ENABLED")
+        window.add_switch(parent, "Hold Mode", "CRYSTAL_HOLD_MODE")
 
     def setup_menu_section(self, parent, window):
         window.add_slider(parent, "Menu Opacity", "MENU_OPACITY", 0.2, 1.0, steps=80)
         window.add_switch(parent, "Debug Mode", "DEBUG_MODE")
         window.add_switch(parent, "Streamer Mode", "STREAMER_MODE")
         window.add_button(parent, lambda: self.get_key_text("STREAMER_MODE_KEY", "Streamer Mode Key"), lambda: self.update_keybind("STREAMER_MODE_KEY"))
+        window.add_switch(parent, "Auto Reload on Join", "AUTO_RELOAD_ON_SERVER_SWITCH")
 
     # --- LOGIC ---
 

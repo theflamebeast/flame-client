@@ -23,17 +23,17 @@ def log(message):
         return
 
     prefix = [
-        {"text": "F", "color": "#FF8600", "bold": True},
-        {"text": "l", "color": "#FD791A", "bold": True},
-        {"text": "a", "color": "#FA6B33", "bold": True},
-        {"text": "m", "color": "#F85E4D", "bold": True},
-        {"text": "e", "color": "#F65066", "bold": True},
-        {"text": "C", "color": "#F34380", "bold": True},
-        {"text": "l", "color": "#F13599", "bold": True},
-        {"text": "i", "color": "#EF28B3", "bold": True},
-        {"text": "e", "color": "#EC1ACC", "bold": True},
-        {"text": "n", "color": "#EA0DE6", "bold": True},
-        {"text": "t", "color": "#E700FF", "bold": True},
+        {"text": "F", "color": "#f5d020", "bold": True},
+        {"text": "l", "color": "#f5b617", "bold": True},
+        {"text": "a", "color": "#f59c0e", "bold": True},
+        {"text": "m", "color": "#f58305", "bold": True},
+        {"text": "e", "color": "#f56a03", "bold": True},
+        {"text": "C", "color": "#f55a03", "bold": True},
+        {"text": "l", "color": "#f54a03", "bold": True},
+        {"text": "i", "color": "#f53a03", "bold": True},
+        {"text": "e", "color": "#f53803", "bold": True},
+        {"text": "n", "color": "#f53803", "bold": True},
+        {"text": "t", "color": "#f53803", "bold": True},
         {"text": " ", "color": "white", "bold": False}
     ]
     full_msg = [""] + prefix + [{"text": str(message), "color": "white"}]
@@ -537,32 +537,72 @@ class Triggerbot:
         try:
             # Check if looking at entity
             reach = SETTINGS.get("TRIGGERBOT_REACH", 3.0)
-            targeted_entity = minescript.player_get_targeted_entity(reach)
+            targeted_entity = minescript.player_get_targeted_entity(reach, nbt=True)
             if targeted_entity and targeted_entity.type:
                 debug_log(f"Triggerbot looking at: {targeted_entity.type}")
                 if "player" in targeted_entity.type.lower(): # Loose match
-                    # Cooldown Check
-                    if SETTINGS.get("TRIGGERBOT_1_8_MODE", False):
-                        # 1.8 Spam Click Mode (12-15 CPS)
-                        if time.time() - self.last_attack_time >= 0.07:
-                            minescript.player_press_attack(True)
-                            minescript.player_press_attack(False)
-                            self.last_attack_time = time.time()
-                            debug_log("Triggerbot: Attack (1.8)")
+                    
+                    # Setup Logic
+                    # Disabled auto-shield detection as it triggers on holding (not just blocking)
+                    # is_shield = False
+                    # if targeted_entity.nbt and "shield" in targeted_entity.nbt:
+                    #     is_shield = True
+                        
+                    is_1_8 = SETTINGS.get("TRIGGERBOT_1_8_MODE", False)
+                    is_axe_mode = SETTINGS.get("TRIGGERBOT_AXE_MODE", False)
+                    
+                    target_suffix = "_sword"
+                    should_spam = False
+                    
+                    if is_1_8:
+                        should_spam = True
                     else:
-                        # Modern Cooldown Mode
-                        held_item = get_held_item()
-                        if held_item and "_axe" in held_item:
-                            SWORD_COOLDOWN = 1.0 # Axe Attack Speed
-                        else:
-                            SWORD_COOLDOWN = 0.63 # Sword Attack Speed
-                            
-                        if time.time() - self.last_attack_time >= SWORD_COOLDOWN:
+                        if is_axe_mode:
+                            target_suffix = "_axe"
+                            # User requested simple axe usage (cooldown) for Axe Mode, 
+                            # unless we could detect shield. Since we can't reliably, 
+                            # we default to Cooldown for Axe too.
+                        
+                        # if is_shield:
+                        #     target_suffix = "_axe"
+                        #     should_spam = True 
+                    
+                    # Use inventory to find slots
+                    try:
+                        inventory = minescript.player_inventory()
+                        target_slot = -1
+                        
+                        for item in inventory:
+                             if item.slot is not None and 0 <= item.slot <= 8 and item.item:
+                                if item.item.endswith(target_suffix):
+                                    if target_slot == -1: target_slot = item.slot
+                                    break
+                    except:
+                        target_slot = -1
+
+                    # 1. Switch
+                    if target_slot != -1:
+                        minescript.player_inventory_select_slot(target_slot)
+                    
+                    # 2. Attack Logic
+                    if should_spam:
+                         # 1.8 Spam
+                         if time.time() - self.last_attack_time >= 0.05:
                             minescript.player_press_attack(True)
-                            time.sleep(0.05) # Hold for 50ms
                             minescript.player_press_attack(False)
                             self.last_attack_time = time.time()
-                            debug_log("Triggerbot: Attack (Modern)")
+                            debug_log("Triggerbot: Attack (Spam)")
+                    else:
+                        # Modern Cooldown
+                        # Axe Speed = 1.0s, Sword Speed = 0.63s
+                        cooldown = 1.0 if target_suffix == "_axe" else 0.63
+                        
+                        if time.time() - self.last_attack_time >= cooldown:
+                            minescript.player_press_attack(True)
+                            time.sleep(0.05)
+                            minescript.player_press_attack(False)
+                            self.last_attack_time = time.time()
+                            debug_log(f"Triggerbot: Attack (Modern)")
         except: pass
 
 
@@ -727,14 +767,19 @@ class AutoCrystal:
     def run(self):
         if not SETTINGS["CRYSTAL_ENABLED"]: return
         
-        # Toggle Logic
+        # Input Logic
         key = SETTINGS.get("CRYSTAL_KEY", 67) # Default 'C'
         is_down = is_key_held(key)
-        
-        if is_down and not self.was_key_down:
-            self.active = not self.active
-            log(f"§fAuto Crystal: {'§aON' if self.active else '§cOFF'}")
-        self.was_key_down = is_down
+
+        if SETTINGS.get("CRYSTAL_HOLD_MODE", False):
+            # Hold Mode
+            self.active = is_down
+        else:
+            # Toggle Mode
+            if is_down and not self.was_key_down:
+                self.active = not self.active
+                log(f"§fAuto Crystal: {'§aON' if self.active else '§cOFF'}")
+            self.was_key_down = is_down
 
         if not self.active: return
 
