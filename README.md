@@ -14,7 +14,7 @@ This project is for educational and research purposes only. Do not use on server
 
 ### Running
 1. Launch Minecraft and join a world or server.
-2. Run the client’s Python process (`flame_client_menu.bat`).
+2. Run the client’s Python process (`flame_client_menu.vbs`).
 3. Use the in-game Minescript GUI to open the Flame Client menu (Right Shift by default).
 4. Use the GUI to toggle modules, adjust settings, and reload scripts.
 
