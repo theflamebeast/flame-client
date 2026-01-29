@@ -1,4 +1,4 @@
-from FlameClient.ESP.globals import *
+from flameclient.esp.globals import *
 
 def get_health_color(health, max_health):
     ratio = health / max_health if max_health > 0 else 0

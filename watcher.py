@@ -3,7 +3,7 @@ import os
 import time
 
 # Configuration
-MAIN_SCRIPT_CMD = r"\FlameClient\main"
+MAIN_SCRIPT_CMD = r"\flameclient\main"
 CONFIG_FILENAME = "config.py"
 
 def get_script_dir():

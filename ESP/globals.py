@@ -1,5 +1,5 @@
-from FlameClient.ESP.imports import *;
-from FlameClient.config import COLORS, SETTINGS;
+from flameclient.esp.imports import *;
+from flameclient.config import COLORS, SETTINGS;
 
 def make_color(a, r, g, b):
     # Manual ARGB packing to avoid class resolution issues
@@ -92,8 +92,8 @@ try:
 except:
     pass # Might fail on different mappings/versions
 
-import FlameClient.ESP.drawing as DRAWING;
-import FlameClient.ESP.math as MATH;
+import flameclient.esp.drawing as DRAWING;
+import flameclient.esp.math as MATH;
 
 class EVENT_MANAGER_CLASS:
     def __init__(self):

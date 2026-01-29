@@ -1,6 +1,14 @@
 ## ESP logic adapted from: https://github.com/dementiaenjoyer/Minescript-Projects/tree/main/ESP
-from FlameClient.ESP.globals import *;
-import FlameClient.ESP.healthbars as HEALTHBARS;
+import os;
+import sys;
+
+_current_dir = os.path.dirname(os.path.abspath(__file__));
+_minescript_root = os.path.dirname(os.path.dirname(_current_dir));
+if _minescript_root not in sys.path:
+    sys.path.insert(0, _minescript_root);
+
+from flameclient.esp.globals import *;
+import flameclient.esp.healthbars as HEALTHBARS;
 
 def render(draw_context):
     draw = DRAWING.new;

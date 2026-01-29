@@ -10,7 +10,7 @@ This project is for educational and research purposes only. Do not use on server
 ### Installation
 1. Install Fabric Loader for your Minecraft version.
 2. Add Fabric API and Minescript to your `mods` folder.
-3. Place the `FlameClient` folder inside your `mods/minescript/` directory.
+3. Place the `flameclient` folder inside your `mods/minescript/` directory.
 
 ### Running
 1. Launch Minecraft and join a world or server.

@@ -5,7 +5,15 @@ import ctypes
 import math
 import json
 import os
-from FlameClient.config import SETTINGS
+import sys
+
+# Allow `import flameclient.*` when this script is executed directly by Minescript.
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_minescript_root = os.path.dirname(_current_dir)
+if _minescript_root not in sys.path:
+    sys.path.insert(0, _minescript_root)
+
+from flameclient.config import SETTINGS
 
 # Import feature logic
 # We can import them as modules if they are in the path, or just implement logic here.
@@ -853,14 +861,14 @@ class ESPManager:
                 
                 # Trigger Minescript execution if enabled
                 if new_state:
-                    minescript.execute(r"\FlameClient\ESP\main")
+                    minescript.execute(r"\flameclient\esp\main")
             self.was_key_down = is_down
         
         # Check for external state change (e.g. from menu)
         current_state = SETTINGS.get("ESP_ENABLED", False)
         if current_state != self.last_state:
             if current_state:
-                minescript.execute(r"\FlameClient\ESP\main")
+                minescript.execute(r"\flameclient\esp\main")
             self.last_state = current_state
 
 def main():
@@ -869,7 +877,7 @@ def main():
     
     # 1. Start ESP (Pyjinn Script)
     if SETTINGS["ESP_ENABLED"]:
-        minescript.execute(r"\FlameClient\ESP\main")
+        minescript.execute(r"\flameclient\esp\main")
         log("§fESP Started.")
 
     # 2. Initialize Features
@@ -906,9 +914,9 @@ def main():
             if time.time() - last_config_check > 1.0:
                 try:
                     import importlib
-                    import FlameClient.config
-                    importlib.reload(FlameClient.config)
-                    from FlameClient.config import SETTINGS
+                    import flameclient.config
+                    importlib.reload(flameclient.config)
+                    from flameclient.config import SETTINGS
                     last_config_check = time.time()
                 except: pass
 

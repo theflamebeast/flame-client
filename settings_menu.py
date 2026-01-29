@@ -26,7 +26,7 @@ minescript_root = os.path.dirname(current_dir)
 if minescript_root not in sys.path:
     sys.path.append(minescript_root)
 
-from FlameClient.config import SETTINGS, COLORS
+from flameclient.config import SETTINGS, COLORS
 
 # --- KEY MAPPING ---
 VK_CODE_MAP = {
@@ -571,7 +571,7 @@ class SettingsApp(ctk.CTk):
             Start-Sleep -Milliseconds 100;
             $wshell.SendKeys('{ENTER}');
             Start-Sleep -Milliseconds 50;
-            $wshell.SendKeys('\\FlameClient\\watcher~');
+            $wshell.SendKeys('\\flameclient\\watcher~');
             """
             subprocess.Popen(["powershell", "-Command", ps_script])
             print("Sent reload commands to Minecraft.")

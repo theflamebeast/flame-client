@@ -1,4 +1,4 @@
-import FlameClient.ESP.globals as main;
+import flameclient.esp.globals as main;
 
 def text(draw_context, text_str, x, y, color):
     scale = main.SETTINGS.get("TEXT_SCALE", 1.0)

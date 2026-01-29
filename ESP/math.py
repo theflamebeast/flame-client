@@ -1,4 +1,4 @@
-from FlameClient.ESP.globals import *;
+from flameclient.esp.globals import *;
 
 def get_fov(player): # semi accurate, mc's getfov method is protected/priv so you cant access it w/o java reflection (which i dont wanna use)
     base_value = OPTIONS.fov().get().intValue();
