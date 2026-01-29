@@ -1,0 +1,3 @@
+# Runtime deps for the Flame Client settings manager UI
+# Note: Minescript itself is provided by Minecraft/Minescript, not pip.
+customtkinter>=5.2.0

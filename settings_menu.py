@@ -5,6 +5,7 @@ import ctypes
 import subprocess
 from tkinter import font
 import tkinter as tk
+import platform
 
 # Dependency Check
 try:
@@ -75,6 +76,7 @@ class ConsoleRedirector:
 class BaseWindow(ctk.CTkToplevel):
     def __init__(self, parent, title, geometry):
         super().__init__(parent)
+        self.app = parent
         self.title(title)
         self.geometry(geometry)
         self.attributes('-alpha', SETTINGS.get("MENU_OPACITY", 0.9))
@@ -119,7 +121,7 @@ class BaseWindow(ctk.CTkToplevel):
         return label
 
     def add_switch(self, parent, text, setting_key):
-        switch = ctk.CTkSwitch(parent, text=text, font=("Nunito", 12), command=lambda: self.master.update_setting(setting_key, switch.get()))
+        switch = ctk.CTkSwitch(parent, text=text, font=("Nunito", 12), command=lambda: self.app.update_setting(setting_key, switch.get()))
         if SETTINGS.get(setting_key):
             switch.select()
         switch.pack(pady=2, anchor="w")
@@ -130,7 +132,7 @@ class BaseWindow(ctk.CTkToplevel):
         
         def cmd_wrapper():
             command()
-            self.master.refresh_all_ui()
+            self.app.refresh_all_ui()
         
         btn.configure(command=cmd_wrapper)
         if color:
@@ -164,17 +166,17 @@ class BaseWindow(ctk.CTkToplevel):
             label.configure(text=f"{text}: {value}")
             
             # Auto-save config on slider change (Debounced)
-            self.master.schedule_save()
+            self.app.schedule_save()
             
             # Special case for opacity
             if setting_key == "MENU_OPACITY":
-                self.master.update_opacity(value)
+                self.app.update_opacity(value)
             
             # Special case for alpha colors
             if setting_key == "TEXT_ALPHA":
-                 self.master.update_alpha_hex("TEXT_COLOR", value)
+                  self.app.update_alpha_hex("TEXT_COLOR", value)
             if setting_key == "BOX_ALPHA":
-                 self.master.update_alpha_hex("BOX_COLOR", value)
+                  self.app.update_alpha_hex("BOX_COLOR", value)
 
         slider = ctk.CTkSlider(frame, from_=from_, to=to_, number_of_steps=steps, command=on_value)
         slider.set(current_val)
@@ -191,7 +193,7 @@ class BaseWindow(ctk.CTkToplevel):
         
         def callback(choice):
             SETTINGS[setting_key] = choice
-            self.master.schedule_save()
+            self.app.schedule_save()
             
         combo = ctk.CTkComboBox(frame, values=values, command=callback, width=120, height=24, font=("Nunito", 12))
         combo.set(SETTINGS.get(setting_key, values[0]))
@@ -315,6 +317,9 @@ class SettingsApp(ctk.CTk):
         btn_jobs = ctk.CTkButton(self.console_window, text="Reload Minescript Jobs", command=self.reload_jobs, height=40, font=("Nunito", 14, "bold"), fg_color="#2CC985", hover_color="#229E68")
         btn_jobs.pack(fill="x", padx=10, pady=10)
 
+        btn_health = ctk.CTkButton(self.console_window, text="Run Health Check", command=self.run_health_check, height=40, font=("Nunito", 14, "bold"), fg_color="#4A90E2", hover_color="#357ABD")
+        btn_health.pack(fill="x", padx=10, pady=(0, 10))
+
         btn_reload = ctk.CTkButton(self.console_window, text="Reload Config", command=self.reload_config, height=40, font=("Nunito", 14, "bold"), fg_color="#FFA500", hover_color="#CC8400")
         btn_reload.pack(fill="x", padx=10, pady=(0, 10))
 
@@ -323,6 +328,56 @@ class SettingsApp(ctk.CTk):
         
         self.last_log_size = 0
         self.check_log_updates()
+
+    def run_health_check(self):
+        print("\n=== Flame Client Health Check ===")
+        try:
+            print(f"OS: {platform.platform()}")
+            print(f"Python: {sys.version.split()[0]}")
+            print(f"Executable: {sys.executable}")
+            print(f"Working dir: {os.getcwd()}")
+            print(f"Script dir: {current_dir}")
+            print(f"Minescript root (sys.path add): {minescript_root}")
+
+            # Package import check
+            try:
+                import flameclient
+                print("Package import: flameclient OK")
+            except Exception as e:
+                print(f"Package import: flameclient FAILED ({e})")
+
+            # Dependency check
+            try:
+                import customtkinter
+                print(f"Dependency: customtkinter OK ({getattr(customtkinter, '__version__', 'unknown')})")
+            except Exception as e:
+                print(f"Dependency: customtkinter FAILED ({e})")
+
+            # Config file check
+            config_path = os.path.join(current_dir, "config.py")
+            print(f"Config exists: {os.path.exists(config_path)} ({config_path})")
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    f.read(128)
+                print("Config readable: True")
+            except Exception as e:
+                print(f"Config readable: False ({e})")
+
+            # Write permission check
+            try:
+                test_path = os.path.join(current_dir, "._write_test.tmp")
+                with open(test_path, "w", encoding="utf-8") as f:
+                    f.write("ok")
+                os.remove(test_path)
+                print("Folder writable: True")
+            except Exception as e:
+                print(f"Folder writable: False ({e})")
+
+            # Log file check
+            log_path = os.path.join(current_dir, "latest.log")
+            print(f"Log exists: {os.path.exists(log_path)} ({log_path})")
+        finally:
+            print("=== End Health Check ===\n")
 
     def check_log_updates(self):
         try:
@@ -572,6 +627,8 @@ class SettingsApp(ctk.CTk):
             $wshell.SendKeys('{ENTER}');
             Start-Sleep -Milliseconds 50;
             $wshell.SendKeys('\\flameclient\\watcher~');
+            Start-Sleep -Milliseconds 150;
+            $wshell.SendKeys('\\jobs~');
             """
             subprocess.Popen(["powershell", "-Command", ps_script])
             print("Sent reload commands to Minecraft.")

@@ -25,6 +25,23 @@ import random
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "latest.log")
 
+def _rotate_log_if_needed(max_bytes: int = 1024 * 1024):
+    try:
+        if not os.path.exists(LOG_FILE):
+            return
+        if os.path.getsize(LOG_FILE) <= max_bytes:
+            return
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        rotated = os.path.join(os.path.dirname(LOG_FILE), f"latest_{timestamp}.log")
+        os.replace(LOG_FILE, rotated)
+    except Exception as e:
+        # Don't crash the client on logging errors.
+        if SETTINGS.get("DEBUG_MODE", False):
+            try:
+                minescript.echo(f"§e[DEBUG] Log rotate failed: {e}")
+            except Exception:
+                pass
+
 def log(message):
     # Streamer Mode Check
     if SETTINGS.get("STREAMER_MODE", False):
@@ -48,10 +65,16 @@ def log(message):
     minescript.echo_json(json.dumps(full_msg))
     
     try:
+        _rotate_log_if_needed()
         with open(LOG_FILE, "a") as f:
             timestamp = time.strftime("%H:%M:%S")
             f.write(f"[{timestamp}] {message}\n")
-    except: pass
+    except Exception as e:
+        if SETTINGS.get("DEBUG_MODE", False):
+            try:
+                minescript.echo(f"§e[DEBUG] Log write failed: {e}")
+            except Exception:
+                pass
 
 def debug_log(message):
     if SETTINGS.get("DEBUG_MODE", False):
@@ -848,6 +871,44 @@ class ESPManager:
     def __init__(self):
         self.was_key_down = False
         self.last_state = SETTINGS.get("ESP_ENABLED", False)
+        self.job_started = False
+        self.unsupported_warned = False
+
+    def _kill_existing_esp_jobs(self):
+        try:
+            jobs = minescript.job_info()
+            for job in jobs:
+                try:
+                    if not job.command:
+                        continue
+                    cmd = str(job.command[0]).replace("\\", "/").lower()
+                    if "flameclient/esp/main" in cmd:
+                        minescript.execute(f"\\killjob {job.job_id}")
+                except:
+                    pass
+        except:
+            pass
+
+    def ensure_job_started(self):
+        if self.job_started:
+            return True
+
+        # ESP rendering is currently broken on MC 1.21.11 (DrawContext API mismatch).
+        # Default behavior: don't start it. Allow an override for future debugging.
+        if not SETTINGS.get("ESP_ALLOW_BROKEN", False):
+            # Clean up any existing ESP jobs so users don't get spammed/ticks.
+            self._kill_existing_esp_jobs()
+            if not self.unsupported_warned:
+                self.unsupported_warned = True
+                log("§cESP is currently not supported on Minecraft 1.21.11")
+                log("§7(Not starting ESP job. Set ESP_ALLOW_BROKEN=1 to force.)")
+            return False
+
+        # Be defensive: if a previous bug spawned multiple ESP jobs, clean them up.
+        self._kill_existing_esp_jobs()
+        minescript.execute(r"\flameclient\esp\main")
+        self.job_started = True
+        return True
 
     def run(self):
         # Key Toggle
@@ -858,27 +919,28 @@ class ESPManager:
                 new_state = not SETTINGS.get("ESP_ENABLED", False)
                 SETTINGS["ESP_ENABLED"] = new_state
                 log(f"§fESP: {'§aON' if new_state else '§cOFF'}")
-                
-                # Trigger Minescript execution if enabled
+                # Keep internal state in sync to avoid double-trigger below.
+                self.last_state = new_state
                 if new_state:
-                    minescript.execute(r"\flameclient\esp\main")
+                    self.ensure_job_started()
             self.was_key_down = is_down
         
         # Check for external state change (e.g. from menu)
         current_state = SETTINGS.get("ESP_ENABLED", False)
         if current_state != self.last_state:
             if current_state:
-                minescript.execute(r"\flameclient\esp\main")
+                # If ESP is unsupported, still record the state change so we don't spam the warning.
+                started = self.ensure_job_started()
+                if not started:
+                    self.last_state = current_state
+                    return
             self.last_state = current_state
 
 def main():
     global SETTINGS
     log("§fCore Loaded!")
     
-    # 1. Start ESP (Pyjinn Script)
-    if SETTINGS["ESP_ENABLED"]:
-        minescript.execute(r"\flameclient\esp\main")
-        log("§fESP Started.")
+    # 1. ESP is started lazily (first time enabled) to avoid spawning multiple jobs.
 
     # 2. Initialize Features
     streamer_mode = StreamerMode()

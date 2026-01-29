@@ -60,3 +60,17 @@ j_math = JavaClass("java.lang.Math");
 
 # FABRIC
 hud_render_callback = JavaClass("net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback");
+
+# RENDERING (varies by mappings/version)
+# Used for DrawContext.fill(...) overloads that require a layer/type argument.
+try:
+  gui_layer_class = JavaClass("net.minecraft.client.renderer.RenderType")
+except:
+  try:
+    gui_layer_class = JavaClass("net.minecraft.client.render.RenderLayer")
+  except:
+    try:
+      # Obfuscated fallback (varies wildly); keep as last resort.
+      gui_layer_class = JavaClass("net.minecraft.class_1921")
+    except:
+      gui_layer_class = None

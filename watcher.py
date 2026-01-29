@@ -41,6 +41,10 @@ def main():
     # Initial start
     kill_client_jobs()
     minescript.execute(MAIN_SCRIPT_CMD)
+    try:
+        minescript.execute(r"\jobs")
+    except Exception:
+        pass
     
     last_mtime = os.path.getmtime(config_path)
     
@@ -54,6 +58,10 @@ def main():
                 
                 kill_client_jobs()
                 minescript.execute(MAIN_SCRIPT_CMD)
+                try:
+                    minescript.execute(r"\jobs")
+                except Exception:
+                    pass
                 
         except Exception as e:
             minescript.echo(f"§cWatcher Error: {e}")

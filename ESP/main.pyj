@@ -1,21 +1,50 @@
 ## ESP logic adapted from: https://github.com/dementiaenjoyer/Minescript-Projects/tree/main/ESP
-import os;
-import sys;
-
-_current_dir = os.path.dirname(os.path.abspath(__file__));
-_minescript_root = os.path.dirname(os.path.dirname(_current_dir));
-if _minescript_root not in sys.path:
-    sys.path.insert(0, _minescript_root);
-
 from flameclient.esp.globals import *;
-import flameclient.esp.healthbars as HEALTHBARS;
+
+HEALTHBARS = None
+try:
+    import flameclient.esp.healthbars as HEALTHBARS;
+except Exception as e:
+    if SETTINGS.get("DEBUG_MODE", False):
+        try:
+            echo("[flameclient] ESP import healthbars failed: " + str(e))
+        except:
+            pass
 
 def render(draw_context):
     draw = DRAWING.new;
 
-    level = MINECRAFT.level;
-    player = MINECRAFT.player;
-    game_renderer = MINECRAFT.gameRenderer;
+    # Heartbeat: proves render() is being invoked.
+    try:
+        if SETTINGS.get("DEBUG_MODE", False):
+            global _debug_render_calls
+            try:
+                _debug_render_calls = _debug_render_calls + 1
+            except:
+                _debug_render_calls = 1
+            if _debug_render_calls % 300 == 0:
+                echo("[flameclient] ESP render tick")
+    except:
+        pass;
+
+    # Debug overlay: drawing may break across versions; HUD_RENDER tick logs are primary.
+    # Keep this best-effort and non-fatal.
+    try:
+        if SETTINGS.get("DEBUG_MODE", False):
+            DRAWING.text(draw_context, "ESP callback OK", 6, 6, COLORS["TEXT_COLOR"]);
+    except:
+        pass;
+
+    # Debug: prove basic fill/rect drawing works even if projection is broken.
+    try:
+        if SETTINGS.get("DEBUG_MODE", False):
+            DRAWING.filled_rect(draw_context, 8, 20, 28, 40, make_color(200, 255, 60, 60));
+    except:
+        pass;
+
+    level = LEVEL;
+    player = PLAYER;
+    game_renderer = GAME_RENDERER;
 
     if level is None or player is None or game_renderer is None:
         return
@@ -23,7 +52,21 @@ def render(draw_context):
     if not SETTINGS["ESP_ENABLED"]:
         return;
 
-    camera_position = game_renderer.getMainCamera().getPosition();
+    # 1.21.11+: camera / eye-pos methods frequently change across mappings.
+    # Prefer stable Vec3 position methods that don't take tickDelta.
+    camera_position = None;
+    try:
+        camera_position = game_renderer.getMainCamera().getPosition();
+    except:
+        pass;
+    if (camera_position is None):
+        try:
+            camera_position = player.getPos();
+        except:
+            try:
+                camera_position = player.position();
+            except:
+                return;
 
     for entity in level.players():
         # Settings Checks
@@ -39,7 +82,13 @@ def render(draw_context):
         if (entity.isInvisible()) and (not SETTINGS["SHOW_INVISIBLE"]):
             continue;
 
-        position = entity.getEyePosition(2);
+        try:
+            position = entity.getPos();
+        except:
+            try:
+                position = entity.position();
+            except:
+                continue;
         distance = camera_position.distanceTo(position);
 
         name = entity.getName().getString();
@@ -47,7 +96,15 @@ def render(draw_context):
         if (distance > SETTINGS["MAX_DISTANCE"]) or (name == "empty"):
             continue;
         
-        w2s = MATH.world_to_screen(game_renderer, vector3(position.x, position.y - (entity.getEyeHeight() * 0.5), position.z));
+        try:
+            eye_height = entity.getEyeHeight();
+        except:
+            try:
+                eye_height = entity.getStandingEyeHeight();
+            except:
+                eye_height = entity.getBbHeight() * 0.9;
+
+        w2s = MATH.world_to_screen(game_renderer, vector3(position.x, position.y - (eye_height * 0.5), position.z));
 
         if (not w2s):
             continue;
@@ -60,18 +117,17 @@ def render(draw_context):
 
         half_x, half_y = (x * 0.5), (y * 0.5);
 
-        left, right = j_float(int(w2s_x - half_x)), j_float(int(w2s_x + half_x));
-        top, bottom = j_float(int(w2s_y - half_y)), j_float(int(w2s_y + half_y));
-
-        bottom_a1 = j_float(int(bottom + 1));
-        bottom_n1 = j_float(int(bottom - 1));
+        # Keep coordinates as plain Python ints (Java Float wrappers can break int() casts in helpers).
+        left, right = int(w2s_x - half_x), int(w2s_x + half_x);
+        top, bottom = int(w2s_y - half_y), int(w2s_y + half_y);
 
         # 1. Draw Box
         if SETTINGS["SHOW_BOX"]:
             draw("rect", draw_context, left, top, right, bottom, COLORS["BOX_COLOR"]);
     
         # 2. Draw Healthbar
-        HEALTHBARS.draw(draw_context, entity, left, top, right, bottom);
+        if HEALTHBARS is not None:
+            HEALTHBARS.draw(draw_context, entity, left, top, right, bottom);
 
         # 3. Draw Name
         if SETTINGS["SHOW_NAME"]:
@@ -91,4 +147,16 @@ def render(draw_context):
                 base = (left + (right - left) * 0.5);
                 draw("outline_text", draw_context, safe_literal(formatted).withStyle(FLAGS), base - (FONT.width(formatted) * scale * 0.5), bottom + 2.1, COLORS["TEXT_COLOR"]);
 
-EVENT_MANAGER.register("ESP", render);
+try:
+    EVENT_MANAGER.register("ESP", render);
+    if SETTINGS.get("DEBUG_MODE", False):
+        try:
+            echo("[flameclient] ESP render registered")
+        except:
+            pass
+except Exception as e:
+    if SETTINGS.get("DEBUG_MODE", False):
+        try:
+            echo("[flameclient] ESP register failed: " + str(e))
+        except:
+            pass

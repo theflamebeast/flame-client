@@ -71,6 +71,11 @@ except:
     GAME_RENDERER = MINECRAFT.field_1773
 
 try:
+    PLAYER = MINECRAFT.player
+except:
+    PLAYER = MINECRAFT.field_1724
+
+try:
     LEVEL = MINECRAFT.level
 except:
     LEVEL = MINECRAFT.field_1687
@@ -104,9 +109,69 @@ class EVENT_MANAGER_CLASS:
 
 EVENT_MANAGER = EVENT_MANAGER_CLASS();
 
-def HUD_RENDER(draw_context, _):
-    for name, callback in EVENT_MANAGER.events.items():
-        callback(draw_context);
+_debug_hud_ticks = 0
+_debug_no_events_ticks = 0
 
-# Register the HUD render callback
-hud_render_callback.EVENT.register(hud_render_callback(ManagedCallback(HUD_RENDER)));
+# Keep strong references so the callback isn't GC'd.
+HUD_MANAGED_CALLBACK = None
+HUD_RENDER_CALLBACK = None
+
+def HUD_RENDER(draw_context, _):
+    global _debug_hud_ticks
+    global _debug_no_events_ticks
+    try:
+        if SETTINGS.get("DEBUG_MODE", False):
+            _debug_hud_ticks = _debug_hud_ticks + 1
+            # Throttle to avoid chat spam: roughly once per ~300 frames.
+            if _debug_hud_ticks % 300 == 0:
+                try:
+                    echo("[flameclient] HUD_RENDER tick")
+                except:
+                    pass
+
+            if len(EVENT_MANAGER.events) == 0:
+                _debug_no_events_ticks = _debug_no_events_ticks + 1
+                # Throttle: about once per ~300 frames while empty.
+                if _debug_no_events_ticks % 300 == 0:
+                    try:
+                        echo("[flameclient] ESP: no render events registered")
+                    except:
+                        pass
+            else:
+                _debug_no_events_ticks = 0
+
+        for name, callback in EVENT_MANAGER.events.items():
+            try:
+                callback(draw_context);
+            except Exception as e:
+                if SETTINGS.get("DEBUG_MODE", False):
+                    try:
+                        echo("[flameclient] ESP event '" + str(name) + "' exception: " + str(e))
+                    except:
+                        pass
+    except Exception as e:
+        # Never let exceptions bubble into Fabric's render loop.
+        if SETTINGS.get("DEBUG_MODE", False):
+            try:
+                echo("[flameclient] HUD_RENDER exception: " + str(e))
+            except:
+                pass
+
+# Register the HUD render callback.
+# IMPORTANT: Do not register a null callback; Fabric will crash if a null event is invoked.
+try:
+    # Per Minescript v5 docs: HudRenderCallback.EVENT.register(HudRenderCallback(ManagedCallback(...)))
+    # Also disable cancel_on_exception so transient rendering errors don't permanently disable ESP.
+    HUD_MANAGED_CALLBACK = ManagedCallback(HUD_RENDER, False)
+    HUD_RENDER_CALLBACK = hud_render_callback(HUD_MANAGED_CALLBACK)
+    if HUD_RENDER_CALLBACK is not None:
+        hud_render_callback.EVENT.register(HUD_RENDER_CALLBACK)
+    else:
+        if SETTINGS.get("DEBUG_MODE", False):
+            echo("[flameclient] ESP HUD register returned null")
+except Exception as e:
+    if SETTINGS.get("DEBUG_MODE", False):
+        try:
+            echo("[flameclient] ESP HUD register failed: " + str(e))
+        except:
+            pass
