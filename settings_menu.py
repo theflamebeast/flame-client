@@ -29,6 +29,13 @@ if minescript_root not in sys.path:
 
 from flameclient.config import SETTINGS, COLORS
 
+# --- SETTINGS MIGRATIONS ---
+# Older configs used TRIGGERBOT_REQUIRE_SHIELD_AXE. Keep behavior, but migrate to
+# TRIGGERBOT_REQUIRE_SWORD_AXE (shield requirement removed).
+if "TRIGGERBOT_REQUIRE_SWORD_AXE" not in SETTINGS:
+    SETTINGS["TRIGGERBOT_REQUIRE_SWORD_AXE"] = SETTINGS.get("TRIGGERBOT_REQUIRE_SHIELD_AXE", 0)
+SETTINGS.pop("TRIGGERBOT_REQUIRE_SHIELD_AXE", None)
+
 # --- KEY MAPPING ---
 VK_CODE_MAP = {
     1: "LBUTTON", 2: "RBUTTON", 4: "MBUTTON", 5: "XBUTTON1", 6: "XBUTTON2",
@@ -491,6 +498,8 @@ class SettingsApp(ctk.CTk):
         window.add_switch(parent, "Enable Module", "TRIGGERBOT_ENABLED")
         window.add_switch(parent, "1.8 Mode", "TRIGGERBOT_1_8_MODE")
         window.add_switch(parent, "Axe Mode (Modern)", "TRIGGERBOT_AXE_MODE")
+        window.add_switch(parent, "Auto Switch Weapon", "TRIGGERBOT_AUTO_SWITCH_WEAPON")
+        window.add_switch(parent, "Only While Holding Sword/Axe", "TRIGGERBOT_REQUIRE_SWORD_AXE")
         window.add_slider(parent, "Reach", "TRIGGERBOT_REACH", 3.0, 6.0, steps=30)
 
     def setup_bridging_section(self, parent, window):
