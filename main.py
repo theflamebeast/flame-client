@@ -120,9 +120,19 @@ def get_held_item():
     try:
         inventory = minescript.player_inventory()
         selected_slot = minescript.player_inventory_slot()
+        if selected_slot is None:
+            return None
         for item in inventory:
+            if not item:
+                continue
             if item.slot == selected_slot:
                 return item.item
+            # Some Minescript builds return slot indices as different types.
+            try:
+                if int(item.slot) == int(selected_slot):
+                    return item.item
+            except Exception:
+                pass
     except: pass
     return None
 
@@ -573,77 +583,134 @@ class Triggerbot:
         self.was_key_down = is_down
 
         if not self.active: return
+        
+        if CURRENT_SCREEN is not None:
+            return
 
         # Optional requirement: only run while holding a sword or an axe.
         require_sword_axe = SETTINGS.get(
             "TRIGGERBOT_REQUIRE_SWORD_AXE",
             SETTINGS.get("TRIGGERBOT_REQUIRE_SHIELD_AXE", False),
         )
-        held_item = get_held_item()
-        if require_sword_axe:
-            if not held_item:
-                return
-            if ("_sword" not in held_item) and ("_axe" not in held_item):
-                return
 
-        if CURRENT_SCREEN is not None:
-            return
-
-        # Logic
+        current_held_item = None
         try:
-            # Check if looking at entity
-            reach = SETTINGS.get("TRIGGERBOT_REACH", 3.0)
-            targeted_entity = minescript.player_get_targeted_entity(reach)
-            if targeted_entity:
-                # Setup Logic
-                is_1_8 = SETTINGS.get("TRIGGERBOT_1_8_MODE", False)
-                is_axe_mode = SETTINGS.get("TRIGGERBOT_AXE_MODE", False)
-                auto_switch_weapon = SETTINGS.get("TRIGGERBOT_AUTO_SWITCH_WEAPON", True)
-                
-                target_suffix = "_sword"
-                should_spam = False
-                
-                if is_1_8:
-                    should_spam = True
-                else:
-                    if is_axe_mode:
-                        target_suffix = "_axe"
-                
-                # Use inventory to find slots
-                inventory = minescript.player_inventory()
-                target_slot = -1
-                
-                if inventory:
-                    for item in inventory:
-                             if item.slot is not None and 0 <= item.slot <= 8 and item.item:
-                                if item.item.endswith(target_suffix):
-                                    if target_slot == -1: target_slot = item.slot
-                                    break
-
-                # 1. Optional weapon switch
-                if auto_switch_weapon and target_slot != -1:
-                    minescript.player_inventory_select_slot(target_slot)
-                
-                # 2. Attack Logic
-                if should_spam:
-                        # 1.8 Spam
-                        if time.time() - self.last_attack_time >= 0.05:
-                            minescript.player_press_attack(True)
-                            minescript.player_press_attack(False)
-                            self.last_attack_time = time.time()
-                else:
-                    # Modern Cooldown
-                    effective_suffix = target_suffix
-                    if not auto_switch_weapon:
-                        effective_suffix = "_axe" if (held_item and "_axe" in held_item) else "_sword"
-                    cooldown = 1.0 if effective_suffix == "_axe" else 0.63
-                    
-                    if time.time() - self.last_attack_time >= cooldown:
-                        minescript.player_press_attack(True)
-                        time.sleep(0.05)
-                        minescript.player_press_attack(False)
-                        self.last_attack_time = time.time()
+            inventory = minescript.player_inventory()
+            selected_slot = minescript.player_inventory_slot()
+            if selected_slot is not None:
+                for item in inventory:
+                    if item and item.slot is not None:
+                        is_selected = False
+                        try:
+                            # Handle mixed types (int vs str) for slot IDs
+                            is_selected = (int(item.slot) == int(selected_slot))
+                        except:
+                            is_selected = (item.slot == selected_slot)
+                            
+                        if is_selected:
+                            current_held_item = item.item
+                            break
         except: pass
+
+        if require_sword_axe:
+            if not current_held_item:
+                return
+            # Strict logic similar to AttributeSwap
+            if not (current_held_item.endswith("_sword") or current_held_item.endswith("_axe")):
+                return
+
+        # Logic (kept close to the last known-working version)
+        try:
+            reach = SETTINGS.get("TRIGGERBOT_REACH", 3.0)
+
+            # Match the working version: call without kwargs first.
+            targeted_entity = None
+            try:
+                targeted_entity = minescript.player_get_targeted_entity(reach)
+            except Exception:
+                targeted_entity = None
+
+            # Some Minescript builds need nbt=True; use as fallback.
+            if not targeted_entity:
+                try:
+                    targeted_entity = minescript.player_get_targeted_entity(reach, nbt=True)
+                except Exception:
+                    targeted_entity = None
+
+            if not targeted_entity:
+                return
+
+            # Extract entity type robustly.
+            entity_type = None
+            try:
+                entity_type = targeted_entity.type
+            except Exception:
+                try:
+                    entity_type = targeted_entity.get("type")
+                except Exception:
+                    entity_type = None
+
+            if not entity_type:
+                return
+
+            # Match old behavior: only attack players.
+            if "player" not in str(entity_type).lower():
+                return
+
+            is_1_8 = SETTINGS.get("TRIGGERBOT_1_8_MODE", False)
+            is_axe_mode = SETTINGS.get("TRIGGERBOT_AXE_MODE", False)
+            auto_switch_weapon = SETTINGS.get("TRIGGERBOT_AUTO_SWITCH_WEAPON", False)
+
+            target_suffix = "_sword"
+            should_spam = False
+
+            if is_1_8:
+                should_spam = True
+            else:
+                if is_axe_mode:
+                    target_suffix = "_axe"
+
+            # 1. Optional weapon switch
+            if auto_switch_weapon:
+                try:
+                    inventory = minescript.player_inventory()
+                    target_slot = -1
+                    for item in inventory:
+                        if item.slot is not None and 0 <= item.slot <= 8 and item.item:
+                            if item.item.endswith(target_suffix):
+                                target_slot = item.slot
+                                break
+                    if target_slot != -1:
+                        minescript.player_inventory_select_slot(target_slot)
+                except Exception as e:
+                    debug_log(f"Triggerbot inventory error: {e}")
+
+            # 2. Attack Logic
+            if should_spam:
+                # Match older behavior (about 12-15 cps).
+                if time.time() - self.last_attack_time >= 0.07:
+                    minescript.player_press_attack(True)
+                    minescript.player_press_attack(False)
+                    self.last_attack_time = time.time()
+                    debug_log("Triggerbot: Attack (Spam)")
+            else:
+                # Modern Cooldown Mode: determine cooldown based on what is actually held,
+                # exactly like the known-working version.
+                held_item_now = get_held_item()
+                if held_item_now and "_axe" in held_item_now:
+                    cooldown = 1.0
+                else:
+                    cooldown = 0.63
+
+                if time.time() - self.last_attack_time >= cooldown:
+                    minescript.player_press_attack(True)
+                    time.sleep(0.05)
+                    minescript.player_press_attack(False)
+                    self.last_attack_time = time.time()
+                    debug_log("Triggerbot: Attack (Modern)")
+
+        except Exception as e:
+            debug_log(f"Triggerbot error: {e}")
 
 
 class AttributeSwap:
